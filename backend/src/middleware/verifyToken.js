@@ -1,18 +1,20 @@
 import jwt from "jsonwebtoken";
 
-export const verifyToken = (req, res, next) => {
+export async function verifyToken(request, reply) {
   try {
-    const token = req.cookies?.token || req.headers["authorization"]?.split(" ")[1];
+    // Buscar token desde cookies o encabezado Authorization
+    const token = request.cookies?.token || request.headers?.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ error: "No se encontró token de autenticación" });
+      return reply.code(401).send({ error: "Token no proporcionado" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // payload: { id, rol, sede }
-    next();
+
+    // Agregamos los datos del usuario al request
+    request.user = decoded;
 
   } catch (err) {
-    return res.status(401).json({ error: "Token inválido o expirado" });
+    return reply.code(401).send({ error: "Token inválido o expirado" });
   }
-};
+}
