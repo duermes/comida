@@ -5,8 +5,7 @@ import mongoose from "mongoose";
     refId: { type: mongoose.Schema.Types.ObjectId, required: true }, 
     tipo: { type: String, enum: ['menu', 'carta'], required: true }, 
     cantidad: { type: Number, required: true, min: 1 },
-    precioUnitario: { type: Number, required: true },                
-    notas: { type: String, maxlength: 255 }                          
+    precioUnitario: { type: Number, required: true },                                       
     });
 
 // Esquema principal del pedido
