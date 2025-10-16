@@ -1,4 +1,4 @@
-import PlatoMenuController from "../controllers/platoMenu.controller.js";
+import PlatoMenuController from "../controllers/platosMenu.controller.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 
 export default async function platoMenuRoutes(fastify) {

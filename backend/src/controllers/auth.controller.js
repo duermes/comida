@@ -1,6 +1,6 @@
 import Usuario from "../models/usuario.model.js";
 import bcrypt from "bcrypt";
-import { createAccessToken } from "../libs/jwt.js";
+import { createAccessToken } from "../lib/jwt.js";
 
 // Registro
 export const register = async (req, reply) => {

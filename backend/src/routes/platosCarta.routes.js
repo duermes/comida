@@ -1,4 +1,4 @@
-import PlatoCartaController from "../controllers/platoCarta.controller.js";
+import PlatoCartaController from "../controllers/platosCarta.controller.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 
 export default async function platoCartaRoutes(fastify) {

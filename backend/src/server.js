@@ -2,20 +2,17 @@
 import dotenv from "dotenv";
 dotenv.config();
 import app from "./app.js";
-import {connectDB} from "./db.js";
+import { connectDB } from "./config/db.js";
 
 //Llamada hacia la base de datos
 const PORT = process.env.PORT || 3000;
 
 try {
-//Conexión a la base de datos
   await connectDB();
-
-//Iniciar el servidor web si es que la base de datos funciona
-  app.listen(PORT, () => {
-    console.log(`Web server running on port: ${PORT}`);
-  });
+  await app.listen({ port: PORT });
+  console.log(`Web server running on port: ${PORT}`);
 } catch (err) {
-  console.error("No se pudo iniciar el servidor por fallo en la base de datos");
+  console.error("Error real al iniciar el servidor:", err);
   process.exit(1);
 }
+

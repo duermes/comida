@@ -1,6 +1,6 @@
-import Nota from "../models/notas.model.js";
-import PlatoCarta from "../models/platoCarta.model.js";
-import PlatoMenu from "../models/platoMenu.model.js";
+import {Nota} from "../models/notas.model.js";
+import PlatoCarta from "../models/platosCarta.model.js";
+import PlatoMenu from "../models/platosMenu.model.js";
 
 const ROLES = {
   ADMIN: 'admin',

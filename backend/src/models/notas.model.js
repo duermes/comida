@@ -12,3 +12,4 @@ const notasSchema = new mongoose.Schema({
   descripcion: { type: String, required: true, maxlength: 1000 },
   creadoEn: { type: Date, default: Date.now }
 });
+export const Nota = mongoose.model("Nota", notasSchema);

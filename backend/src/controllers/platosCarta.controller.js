@@ -1,4 +1,4 @@
-import PlatoCarta from "../models/platoCarta.model.js";
+import PlatoCarta from "../models/platosCarta.model.js";
 
 const ROLES = {
   ADMIN: 'admin',

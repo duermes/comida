@@ -1,5 +1,5 @@
 import Pedido from "../models/pedido.model.js";
-import PlatoCarta from "../models/platoCarta.model.js";
+import PlatoCarta from "../models/platosCarta.model.js";
 import Menu from "../models/menu.model.js";
 
 const ROLES = {

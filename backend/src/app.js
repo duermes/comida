@@ -33,6 +33,6 @@ await app.register(platosMenuRoutes, { prefix: "/api/platos-menu" });
 await app.register(usuarioRoutes, { prefix: "/api/usuarios" });
 
 // Ruta base de prueba
-app.get("/", async () => ({ message: "✅ Servidor Fastify operativo" }));
+app.get("/", async () => ({ message: "Servidor Fastify operativo" }));
 
 export default app;
