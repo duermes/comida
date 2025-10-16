@@ -38,3 +38,13 @@ export async function verificarToken(req, reply) {
     return reply.code(401).send({ message: "Token inválido o expirado" });
   }
 }
+
+// Middleware para verificar roles
+export const verificarRol = (rolesPermitidos = []) => {
+  return async (req, reply) => {
+    if (!req.user) return reply.code(401).send({ message: "No autenticado" });
+    if (!rolesPermitidos.includes(req.user.rol)) {
+      return reply.code(403).send({ message: "No tienes permisos para acceder a esta ruta" });
+    }
+  };
+};
