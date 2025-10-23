@@ -1,22 +1,25 @@
-# Usa una imagen oficial de Node.js versión 20
-FROM node:20
-
-# Crea y establece el directorio de trabajo dentro del contenedor
+# Etapa 1: construir la app
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-ENV NPM_CONFIG_LEGACY_PEER_DEPS=1 \
-    NEXT_TELEMETRY_DISABLED=1S
+COPY package*.json ./
+RUN npm install
 
-COPY package*.json  package-lock.json* ./
-
-RUN npm install --legacy-peer-deps
-
-COPY next.config.ts ./
-COPY src ./src
-COPY public ./public
+COPY . .
 
 RUN npm run build
 
+# Etapa 2: ejecutar la app
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package*.json ./
+
+RUN npm install --omit=dev
+
 EXPOSE 3000
 
+# Comando de inicio
 CMD ["npm", "start"]
