@@ -1,10 +1,5 @@
 import PlatoMenu from "../models/platosMenu.model.js";
-
-const ROLES = {
-  ADMIN: "admin",
-  COORD: "coordinador",
-  USER: "usuario",
-};
+import { ROLES } from "../lib/utils.js";
 
 class PlatoMenuController {
   // Crear un nuevo plato (solo admin o coordinador de su sede)

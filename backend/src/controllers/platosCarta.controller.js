@@ -1,10 +1,5 @@
 import PlatoCarta from "../models/platosCarta.model.js";
-
-const ROLES = {
-  ADMIN: 'admin',
-  COORD: 'coordinador',
-  USER: 'usuario'
-};
+import { ROLES } from "../lib/utils.js";
 
 class PlatoCartaController {
 

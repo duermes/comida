@@ -1,12 +1,7 @@
 import Pedido from "../models/pedido.model.js";
 import PlatoCarta from "../models/platosCarta.model.js";
 import Menu from "../models/menu.model.js";
-
-const ROLES = {
-  ADMIN: "admin",
-  COORD: "coordinador",
-  USER: "usuario",
-};
+import { ROLES } from "../lib/utils.js";
 
 class PedidoController {
   // Crear pedido

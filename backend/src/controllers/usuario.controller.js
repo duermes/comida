@@ -1,11 +1,5 @@
 import Usuario from "../models/usuario.model.js";
-
-// Roles permitidos
-const ROLES = {
-  ADMIN: 'admin',
-  COORD: 'coordinador',
-  USER: 'usuario'
-};
+import { ROLES } from "../lib/utils.js";
 
 class UsuarioController {
 

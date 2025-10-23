@@ -1,11 +1,6 @@
 import Menu from "../models/menu.model.js";
 import PlatoMenu from "../models/platosMenu.model.js";
-
-const ROLES = {
-  ADMIN: 'admin',
-  COORD: 'coordinador',
-  USER: 'usuario'
-};
+import { ROLES } from "../lib/utils.js";
 
 class MenuController {
 
