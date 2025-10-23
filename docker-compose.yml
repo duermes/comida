@@ -1,9 +1,13 @@
 services:
   frontend:
     build: ./frontend
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=1
+      - WATCHPACK_POLLING=trueS
     ports:
-      - "5000:5000"
+      - "3000:3000"
     volumes:
       - ./frontend:/app
-    command: npm run dev
-
+      - /app/node_modules
+    command: npm run dev -- -p 3000 -H 0.0.0.0
