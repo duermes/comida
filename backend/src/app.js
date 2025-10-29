@@ -10,6 +10,7 @@ import pedidoRoutes from "./routes/pedido.routes.js";
 import platosCartaRoutes from "./routes/platosCarta.routes.js";
 import platosMenuRoutes from "./routes/platosMenu.routes.js";
 import usuarioRoutes from "./routes/usuario.routes.js";
+import reservaMasivaRoutes from "./routes/reservaMasiva.routes.js";
 
 const app = Fastify({ logger: true });
 
@@ -19,7 +20,7 @@ await app.register(cookie, {
 });
 
 await app.register(cors, {
-  origin: "*", // cámbialo luego por tu frontend
+  origin: "*", // cámbialo luego por el frontend
   credentials: true,
 });
 
@@ -31,6 +32,7 @@ await app.register(pedidoRoutes, { prefix: "/api/pedidos" });
 await app.register(platosCartaRoutes, { prefix: "/api/platos-carta" });
 await app.register(platosMenuRoutes, { prefix: "/api/platos-menu" });
 await app.register(usuarioRoutes, { prefix: "/api/usuarios" });
+app.register(reservaMasivaRoutes, { prefix: "/api" });
 
 // Ruta base de prueba
 app.get("/", async () => ({ message: "Servidor Fastify operativo" }));
