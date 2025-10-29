@@ -1,19 +1,16 @@
 import jwt from "jsonwebtoken";
 
-export async function verifyToken(request, reply) {
+// reemplazo: export named -> export default y mantener firma Fastify
+export default async function verifyToken(request, reply) {
   try {
-    // Buscar token desde cookies o encabezado Authorization
-    const token = request.cookies?.token || request.headers?.authorization?.split(" ")[1];
-
+    const token = request.cookies?.token || (request.headers?.authorization ? request.headers.authorization.split(" ")[1] : null);
     if (!token) {
       return reply.code(401).send({ error: "Token no proporcionado" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Agregamos los datos del usuario al request
-    request.user = decoded;
-
+    request.user = decoded; // importante: request.user será usado por otros handlers
+    return; // continuar al handler
   } catch (err) {
     return reply.code(401).send({ error: "Token inválido o expirado" });
   }

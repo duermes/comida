@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const UsuarioSchema = new mongoose.Schema({
 // Nombre y contraseña de usuario
   nombre: { type: String, required: true },
-  contraseña: { type: String, required: true },
+  password: { type: String, required: true },
 
 // Tipo de usuario: 'interno' o 'externo'
   tipo: { type: String, enum: ['interno', 'externo'], required: true },
@@ -21,7 +21,7 @@ const UsuarioSchema = new mongoose.Schema({
   },
 
 // Rol del usuario
-  rol: { type: String, enum: ['usuario', 'admin', 'coordinador'], default: 'usuario' },
+  rol: { type: String, enum: ['usuario', 'admin', 'profesor', 'coordinador'], default: 'usuario' }, // agregado profesor
 
   // Sede a la que pertenece el usuario (solo para usuarios internos)
   sede: { type: String },
@@ -33,6 +33,6 @@ const UsuarioSchema = new mongoose.Schema({
   }],
 // Estado del usuario
   activo: { type: Boolean, default: true }
-});
+}, { timestamps: true });
 
 export default mongoose.model('Usuario', UsuarioSchema);
