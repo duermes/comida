@@ -4,7 +4,7 @@ import { createAccessToken } from "../lib/jwt.js";
 
 // Registro
 export const register = async (req, reply) => {
-  const { nombre, contraseña, tipo, codigoUsu, dni, rol } = req.body;
+  const { nombre, password, tipo, codigoUsu, dni, rol } = req.body;
 
   try {
     // Verificar si ya existe un usuario con el mismo codigoUsu o dni
@@ -19,20 +19,30 @@ export const register = async (req, reply) => {
 
     // Control de permisos para crear admin o coordinador
     let roleToAssign = "usuario";
-    if (rol && ["admin", "coordinador"].includes(rol)) {
-      if (!req.user || req.user.rol !== "admin") {
-        return reply.status(403).send({ message: "Solo un admin puede crear otros admin o coordinadores" });
+
+    if (rol) {
+      if (["admin", "coordinador"].includes(rol)) {
+        // Solo un admin puede crear admin o coordinadores
+        if (!req.user || req.user.rol !== "admin") {
+          return reply.status(403).send({ message: "Solo un admin puede crear otros admin o coordinadores" });
+        }
+      } else if (rol === "profesor") {
+        // Solo admin o coordinador pueden crear profesores
+        if (!req.user || !["admin", "coordinador"].includes(req.user.rol)) {
+          return reply.status(403).send({ message: "Solo un admin o coordinador puede crear profesores" });
+        }
       }
+
       roleToAssign = rol;
     }
 
     // Encriptar contraseña
-    const hashedPassword = await bcrypt.hash(contraseña, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Crear el nuevo usuario
     const newUser = new Usuario({
       nombre,
-      contraseña: hashedPassword,
+      password: hashedPassword,
       tipo,
       codigoUsu,
       dni,
@@ -52,13 +62,15 @@ export const register = async (req, reply) => {
     });
 
   } catch (error) {
-    reply.status(500).send({ message: "Error en el servidor", error });
+  console.error("Error en register:", error);
+  reply.status(500).send({ message: "Error en el servidor", error });
   }
+
 };
 
 // Login
 export const login = async (req, reply) => {
-  const { identificador, contraseña } = req.body;
+  const { identificador, password } = req.body;
 
   try {
     const userFound = await Usuario.findOne({
@@ -70,7 +82,7 @@ export const login = async (req, reply) => {
 
     if (!userFound) return reply.status(400).send({ message: "Usuario no encontrado" });
 
-    const isMatch = await bcrypt.compare(contraseña, userFound.contraseña);
+    const isMatch = await bcrypt.compare(password, userFound.password);
     if (!isMatch) return reply.status(400).send({ message: "Contraseña incorrecta" });
 
     if (!userFound.activo) return reply.status(403).send({ message: "Usuario inactivo. Contacta con el administrador." });
@@ -93,4 +105,22 @@ export const login = async (req, reply) => {
 export const logout = async (req, reply) => {
   reply.clearCookie("token");
   reply.send({ message: "Sesión cerrada" });
+};
+
+export const getPerfil = async (req, reply) => {
+  try {
+    const user = await Usuario.findById(req.user.id).select("-password");
+    if (!user) return reply.status(404).send({ message: "Usuario no encontrado" });
+
+    reply.send({
+      id: user._id,
+      nombre: user.nombre,
+      rol: user.rol,
+      codigoUsu: user.codigoUsu,
+      dni: user.dni,
+      tipo: user.tipo
+    });
+  } catch (error) {
+    reply.status(500).send({ message: "Error obteniendo perfil", error });
+  }
 };
