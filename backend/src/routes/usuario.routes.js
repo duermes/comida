@@ -1,5 +1,5 @@
 import UsuarioController from "../controllers/usuario.controller.js";
-import { verifyToken } from "../middleware/verifyToken.js";
+import verifyToken from "../middleware/verifyToken.js";
 
 export default async function usuarioRoutes(fastify) {
 

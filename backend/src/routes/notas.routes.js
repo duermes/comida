@@ -1,5 +1,5 @@
 import NotasController from "../controllers/notas.controller.js";
-import { verifyToken } from "../middleware/verifyToken.js";
+import verifyToken from "../middleware/verifyToken.js";
 
 export default async function notasRoutes(fastify) {
 

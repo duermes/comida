@@ -1,5 +1,5 @@
 import MenuController from "../controllers/menu.controller.js";
-import { verifyToken } from "../middleware/verifyToken.js";
+import verifyToken from "../middleware/verifyToken.js";
 
 export default async function menuRoutes(fastify) {
 
