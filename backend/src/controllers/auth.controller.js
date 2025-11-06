@@ -7,39 +7,45 @@ export const register = async (req, reply) => {
   const { nombre, password, tipo, codigoUsu, dni, rol } = req.body;
 
   try {
-    // Verificar si ya existe un usuario con el mismo codigoUsu o dni
+    // Verificar duplicados
     const userFound = await Usuario.findOne({
       $or: [
         codigoUsu ? { codigoUsu } : null,
         dni ? { dni } : null
-      ].filter(Boolean) // Evita nulls en la consulta
+      ].filter(Boolean)
     });
 
-    if (userFound) return reply.status(400).send({ message: "El usuario ya existe (DNI o Código duplicado)" });
-
-    // Control de permisos para crear admin o coordinador
-    let roleToAssign = "usuario";
-
-    if (rol) {
-      if (["admin", "coordinador"].includes(rol)) {
-        // Solo un admin puede crear admin o coordinadores
-        if (!req.user || req.user.rol !== "admin") {
-          return reply.status(403).send({ message: "Solo un admin puede crear otros admin o coordinadores" });
-        }
-      } else if (rol === "profesor") {
-        // Solo admin o coordinador pueden crear profesores
-        if (!req.user || !["admin", "coordinador"].includes(req.user.rol)) {
-          return reply.status(403).send({ message: "Solo un admin o coordinador puede crear profesores" });
-        }
-      }
-
-      roleToAssign = rol;
+    if (userFound) {
+      return reply.status(400).send({ message: "El usuario ya existe (DNI o Código duplicado)" });
     }
 
-    // Encriptar contraseña
+    // Definir el rol a asignar
+    let roleToAssign = "usuario";
+
+    // Si NO hay token (usuario no autenticado), solo puede crearse como "usuario"
+    if (!req.user) {
+      // Ignorar cualquier intento de enviar rol manualmente
+      roleToAssign = "usuario";
+    } else {
+      // Si HAY token, aplicar control de permisos
+      if (rol) {
+        if (["admin", "coordinador"].includes(rol)) {
+          if (req.user.rol !== "admin") {
+            return reply.status(403).send({ message: "Solo un admin puede crear otros admin o coordinadores" });
+          }
+        } else if (rol === "profesor") {
+          if (!["admin", "coordinador"].includes(req.user.rol)) {
+            return reply.status(403).send({ message: "Solo un admin o coordinador puede crear profesores" });
+          }
+        }
+        roleToAssign = rol;
+      }
+    }
+
+    // Encriptar la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crear el nuevo usuario
+    // Crear y guardar el nuevo usuario
     const newUser = new Usuario({
       nombre,
       password: hashedPassword,
@@ -51,9 +57,11 @@ export const register = async (req, reply) => {
 
     const savedUser = await newUser.save();
 
-    // Crear token y enviarlo en cookie
-    const token = await createAccessToken({ id: savedUser._id, rol: savedUser.rol });
-    reply.setCookie("token", token, { httpOnly: true, sameSite: "strict", secure: false });
+    // Generar token solo para el usuario que se auto-registra (sin token previo)
+    if (!req.user) {
+      const token = await createAccessToken({ id: savedUser._id, rol: savedUser.rol });
+      reply.setCookie("token", token, { httpOnly: true, sameSite: "strict", secure: false });
+    }
 
     reply.send({
       id: savedUser._id,
@@ -62,10 +70,9 @@ export const register = async (req, reply) => {
     });
 
   } catch (error) {
-  console.error("Error en register:", error);
-  reply.status(500).send({ message: "Error en el servidor", error });
+    console.error("Error en register:", error);
+    reply.status(500).send({ message: "Error en el servidor", error });
   }
-
 };
 
 // Login
