@@ -1,30 +1,61 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import Sidebar from "@/components/layout/sidebar"
-import Header from "@/components/layout/header"
+import {useEffect, useState} from "react";
+import {useRouter} from "next/navigation";
+import Sidebar from "@/components/layout/sidebar";
+import Header from "@/components/layout/header";
+import {getProfile} from "@/lib/api";
 
-export default function HomeLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
+export default function HomeLayout({children}: {children: React.ReactNode}) {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const userData = localStorage.getItem("user")
-    if (!userData) {
-      router.push("/")
-      return
-    }
-    setUser(JSON.parse(userData))
-    setIsLoading(false)
-  }, [router])
+    let isActive = true;
+
+    const bootstrapUser = async () => {
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        localStorage.removeItem("user");
+        if (isActive) {
+          setUser(null);
+        }
+        if (isActive) {
+          setIsLoading(false);
+          router.push("/");
+        }
+        return;
+      }
+
+      try {
+        const profile = await getProfile();
+        if (!isActive) return;
+        setUser(profile);
+        localStorage.setItem("user", JSON.stringify(profile));
+      } catch (error) {
+        console.error("Error al obtener perfil:", error);
+        localStorage.removeItem("user");
+        localStorage.removeItem("authToken");
+        if (isActive) {
+          setUser(null);
+          router.push("/");
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    bootstrapUser();
+
+    return () => {
+      isActive = false;
+    };
+  }, [router]);
 
   if (isLoading) {
     return (
@@ -34,7 +65,7 @@ export default function HomeLayout({
           <p className="text-foreground-secondary">Cargando...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -45,5 +76,5 @@ export default function HomeLayout({
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>
-  )
+  );
 }

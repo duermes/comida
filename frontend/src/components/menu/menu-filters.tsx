@@ -1,32 +1,42 @@
-"use client"
+"use client";
 
-import { Search, MapPin } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {Search, MapPin} from "lucide-react";
+import {Input} from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface CategoryOption {
+  value: string;
+  label: string;
+}
 
 interface MenuFiltersProps {
-  selectedSede: string
-  selectedCategory: string
-  onSedChange: (sede: string) => void
-  onCategoryChange: (category: string) => void
+  sedes: string[];
+  categories: CategoryOption[];
+  selectedSede: string;
+  selectedCategory: string;
+  searchTerm: string;
+  onSedeChange: (sede: string) => void;
+  onCategoryChange: (category: string) => void;
+  onSearchChange: (query: string) => void;
 }
 
 export default function MenuFilters({
+  sedes,
+  categories,
   selectedSede,
   selectedCategory,
-  onSedChange,
+  searchTerm,
+  onSedeChange,
   onCategoryChange,
+  onSearchChange,
 }: MenuFiltersProps) {
-  const sedes = ["Pacifico", "Arequipa", "Herna Velarde"]
-  const categories = [
-    "Menú universitario",
-    "Menú ejecutivo",
-    "Platos a la carta",
-    "Hamburguesas",
-    "Postres",
-    "Bebidas",
-    "Especiales del día",
-  ]
+  const availableSedes = sedes.length ? sedes : ["Todas"];
 
   return (
     <div className="mb-8 space-y-4">
@@ -36,17 +46,26 @@ export default function MenuFilters({
 
       <div className="flex gap-4 flex-wrap">
         <div className="flex-1 min-w-64 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground-secondary" size={18} />
-          <Input type="text" placeholder="Buscar" className="pl-10" />
+          <Search
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground-secondary"
+            size={18}
+          />
+          <Input
+            type="text"
+            value={searchTerm}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Buscar"
+            className="pl-10"
+          />
         </div>
 
-        <Select value={selectedSede} onValueChange={onSedChange}>
+        <Select value={selectedSede} onValueChange={onSedeChange}>
           <SelectTrigger className="w-48">
             <MapPin size={18} className="mr-2" />
             <SelectValue placeholder="Seleccionar sede" />
           </SelectTrigger>
           <SelectContent>
-            {sedes.map((sede) => (
+            {availableSedes.map((sede) => (
               <SelectItem key={sede} value={sede}>
                 {sede}
               </SelectItem>
@@ -60,13 +79,13 @@ export default function MenuFilters({
           </SelectTrigger>
           <SelectContent>
             {categories.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
+              <SelectItem key={cat.value} value={cat.value}>
+                {cat.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
     </div>
-  )
+  );
 }

@@ -1,88 +1,68 @@
-"use client"
+"use client";
 
-import DishCard from "@/components/menu/dish-card"
+import DishCard from "@/components/menu/dish-card";
+import type {PopulatedMenu} from "@/lib/api";
 
-interface MenuGridProps {
-  sede: string
-  category: string
-  onSelectDish: (dish: any) => void
+export interface DisplayMenuItem {
+  id: string;
+  menuId: string;
+  variant: "normal" | "ejecutivo";
+  title: string;
+  description: string;
+  price: number;
+  image?: string;
+  sede: string;
+  isFavorite: boolean;
+  menu: PopulatedMenu;
 }
 
-const MOCK_DISHES = [
-  {
-    id: 1,
-    name: "Pollo a la Parrilla",
-    description: "Jugoso pollo cocinado a la perfección con un toque de hierbas frescas.",
-    price: 11.0,
-    image: "/grilled-chicken-plate.jpeg",
-    category: "Menú universitario",
-    sede: "Pacifico",
-    isFavorite: false,
-  },
-  {
-    id: 2,
-    name: "Ensalada César Vegana",
-    description: "Una versión vegana y deliciosa de la clásica ensalada César con aderezo cremoso.",
-    price: 10.0,
-    image: "/vegan-caesar-salad.jpeg",
-    category: "Menú universitario",
-    sede: "Pacifico",
-    isFavorite: true,
-  },
-  {
-    id: 3,
-    name: "Lomo saltado Clásico",
-    description: "Plato a la carta con trozos de carne jugosos, salteados al wok con verduras y sabor criollo.",
-    price: 11.0,
-    image: "/lomo-saltado-peruvian-beef.jpg",
-    category: "Platos a la carta",
-    sede: "Pacifico",
-    isFavorite: false,
-  },
-  {
-    id: 4,
-    name: "Hamburguesa de pollo a la Parrilla",
-    description: "Jugoso pollo cocinado a la perfección con un toque de limón y hierbas frescas.",
-    price: 14.0,
-    image: "/grilled-chicken-burger.jpg",
-    category: "Hamburguesas",
-    sede: "Arequipa",
-    isFavorite: false,
-  },
-  {
-    id: 5,
-    name: "Postres Especiales",
-    description: "Deliciosos postres caseros preparados diariamente.",
-    price: 8.0,
-    image: "/dessert-plate.jpg",
-    category: "Postres",
-    sede: "Herna Velarde",
-    isFavorite: false,
-  },
-  {
-    id: 6,
-    name: "Bebida Refrescante",
-    description: "Bebida natural y refrescante para acompañar tu comida.",
-    price: 5.0,
-    image: "/refreshing-drink.jpg",
-    category: "Bebidas",
-    sede: "Pacifico",
-    isFavorite: false,
-  },
-]
+interface MenuGridProps {
+  items: DisplayMenuItem[];
+  isLoading: boolean;
+  onSelectDish: (dish: DisplayMenuItem) => void;
+  onToggleFavorite: (menuId: string) => void;
+}
 
-export default function MenuGrid({ sede, category, onSelectDish }: MenuGridProps) {
-  const filteredDishes = MOCK_DISHES.filter((dish) => dish.sede === sede && dish.category === category)
+export default function MenuGrid({
+  items,
+  isLoading,
+  onSelectDish,
+  onToggleFavorite,
+}: MenuGridProps) {
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {Array.from({length: 6}).map((_, index) => (
+          <div
+            key={index}
+            className="h-64 bg-background-secondary animate-pulse rounded-lg"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (!items.length) {
+    return (
+      <div className="col-span-full text-center py-12 bg-white rounded-xl border border-dashed border-border">
+        <p className="text-foreground-secondary">
+          No hay menús disponibles con los filtros seleccionados
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {filteredDishes.length > 0 ? (
-        filteredDishes.map((dish) => <DishCard key={dish.id} dish={dish} onSelect={() => onSelectDish(dish)} />)
-      ) : (
-        <div className="col-span-full text-center py-12">
-          <p className="text-foreground-secondary">No hay platos disponibles en esta categoría</p>
-        </div>
-      )}
+      {items.map((dish) => (
+        <DishCard
+          key={dish.id}
+          dish={dish}
+          isFavorite={dish.isFavorite}
+          onToggleFavorite={() => onToggleFavorite(dish.menuId)}
+          onSelect={() => onSelectDish(dish)}
+        />
+      ))}
     </div>
-  )
+  );
 }

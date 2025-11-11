@@ -1,40 +1,32 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import LoginForm from "@/components/auth/login-form"
+import {useState} from "react";
+import {useRouter} from "next/navigation";
+import LoginForm from "@/components/auth/login-form";
+import {getProfile, login} from "@/lib/api";
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (codigo: string, password: string) => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      // Simulación de autenticación
-      // luego llamar al API
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          codigo,
-          role: "user", 
-          name: "Cristhian",
-        }),
-      )
-
-      router.push("/home/menu")
+      await login(codigo, password);
+      const profile = await getProfile();
+      localStorage.setItem("user", JSON.stringify(profile));
+      router.push("/home/menu");
     } catch (error) {
-      console.error("Error en login:", error)
+      console.error("Error en login:", error);
+      throw error;
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-primary-light flex items-center justify-center p-4">
       <LoginForm onSubmit={handleLogin} isLoading={isLoading} />
     </div>
-  )
+  );
 }

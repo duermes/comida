@@ -12,7 +12,12 @@ import platosMenuRoutes from "./routes/platosMenu.routes.js";
 import usuarioRoutes from "./routes/usuario.routes.js";
 import reservaMasivaRoutes from "./routes/reservaMasiva.routes.js";
 
-const app = Fastify({ logger: true });
+const app = Fastify({logger: true});
+
+const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:3000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // Configurar cookies y CORS
 await app.register(cookie, {
@@ -20,21 +25,34 @@ await app.register(cookie, {
 });
 
 await app.register(cors, {
-  origin: "*", // cámbialo luego por el frontend
+  origin: (origin, cb) => {
+    if (!origin) {
+      cb(null, true);
+      return;
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      cb(null, true);
+      return;
+    }
+
+    cb(new Error("Not allowed"), false);
+  },
   credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"],
 });
 
 // Registrar las rutas
-await app.register(authRoutes, { prefix: "/api/auth" });
-await app.register(notasRoutes, { prefix: "/api/notas" });
-await app.register(menuRoutes, { prefix: "/api/menus" });
-await app.register(pedidoRoutes, { prefix: "/api/pedidos" });
-await app.register(platosCartaRoutes, { prefix: "/api/platos-carta" });
-await app.register(platosMenuRoutes, { prefix: "/api/platos-menu" });
-await app.register(usuarioRoutes, { prefix: "/api/usuarios" });
-app.register(reservaMasivaRoutes, { prefix: "/api" });
+await app.register(authRoutes, {prefix: "/api/auth"});
+await app.register(notasRoutes, {prefix: "/api/notas"});
+await app.register(menuRoutes, {prefix: "/api/menus"});
+await app.register(pedidoRoutes, {prefix: "/api/pedidos"});
+await app.register(platosCartaRoutes, {prefix: "/api/platos-carta"});
+await app.register(platosMenuRoutes, {prefix: "/api/platos-menu"});
+await app.register(usuarioRoutes, {prefix: "/api/usuarios"});
+app.register(reservaMasivaRoutes, {prefix: "/api"});
 
 // Ruta base de prueba
-app.get("/", async () => ({ message: "Servidor Fastify operativo" }));
+app.get("/", async () => ({message: "Servidor Fastify operativo"}));
 
 export default app;

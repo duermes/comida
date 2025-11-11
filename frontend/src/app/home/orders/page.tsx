@@ -1,68 +1,144 @@
-"use client"
+"use client";
 
-import OrderCard from "@/components/orders/order-cards"
+import {useEffect, useMemo, useState} from "react";
+import OrderCard from "@/components/orders/order-cards";
+import {getPedidos, type PedidoResponse} from "@/lib/api";
 
-const MOCK_ORDERS = [
-  {
-    id: "#1255",
-    status: "Confirmado",
-    dish: "Pollo a la Parrilla",
-    category: "Entrada",
-    menu: "Menú Estudiantil",
-    sede: "Torre Pacifico",
-    date: "26/09/2025",
-    time: "01:00 pm",
-    image: "/grilled-chicken.jpg",
-  },
-  {
-    id: "#1275",
-    status: "Pendiente",
-    dish: "Ensalada César Vegana",
-    category: "Entrada",
-    menu: "Menú Ejecutivo",
-    sede: "Torre Pacifico",
-    date: "26/09/2025",
-    time: "01:00 pm",
-    image: "/caesar-salad.png",
-  },
-]
+interface UIOrder {
+  id: string;
+  status: string;
+  dish: string;
+  category: string;
+  menu: string;
+  sede: string;
+  date: string;
+  time: string;
+  image?: string | null;
+}
 
-const PAST_ORDERS = [
-  {
-    id: "#1075",
-    status: "Finalizado",
-    dish: "Ensalada César Vegana",
-    category: "Entrada",
-    menu: "Menú Ejecutivo",
-    sede: "Torre Pacifico",
-    date: "19/09/2025",
-    time: "01:00 pm",
-    image: "/caesar-salad.png",
-  },
-]
+const STATUS_MAP: Record<string, string> = {
+  pendiente: "Pendiente",
+  pagado: "Confirmado",
+  preparando: "Preparando",
+  listo: "Listo",
+  entregado: "Finalizado",
+  cancelado: "Cancelado",
+};
 
 export default function OrdersPage() {
+  const [orders, setOrders] = useState<PedidoResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      setIsLoading(true);
+      try {
+        const response = await getPedidos();
+        setOrders(response);
+      } catch (error) {
+        console.error("Error al obtener reservas:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadOrders();
+  }, []);
+
+  const {currentOrders, pastOrders} = useMemo(() => {
+    const transform = (pedido: PedidoResponse): UIOrder => {
+      const primerItem = pedido.items[0];
+      const fecha = new Date(pedido.creadoEn);
+      const status = STATUS_MAP[pedido.estado] ?? pedido.estado;
+
+      return {
+        id: `#${pedido._id.slice(-6)}`,
+        status,
+        dish: primerItem?.nombre ?? "Menú reservado",
+        category: primerItem?.tipo === "menu" ? "Menú" : "Carta",
+        menu: `Reserva ${pedido.items.length > 1 ? "múltiple" : "individual"}`,
+        sede: pedido.sede,
+        date: fecha.toLocaleDateString(),
+        time: fecha.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        image: primerItem?.imagenUrl ?? null,
+      };
+    };
+
+    const partitioned = orders.reduce(
+      (acc, pedido) => {
+        const uiOrder = transform(pedido);
+        if (pedido.estado === "entregado" || pedido.estado === "cancelado") {
+          acc.past.push(uiOrder);
+        } else {
+          acc.current.push(uiOrder);
+        }
+        return acc;
+      },
+      {current: [] as UIOrder[], past: [] as UIOrder[]}
+    );
+
+    return {
+      currentOrders: partitioned.current,
+      pastOrders: partitioned.past,
+    };
+  }, [orders]);
+
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      {/* Current Orders */}
       <div className="mb-12">
-        <h1 className="text-3xl font-bold text-foreground mb-6">Mis reservas</h1>
-        <div className="space-y-4">
-          {MOCK_ORDERS.map((order) => (
-            <OrderCard key={order.id} order={order} />
-          ))}
-        </div>
+        <h1 className="text-3xl font-bold text-foreground mb-6">
+          Mis reservas
+        </h1>
+        {isLoading ? (
+          <div className="space-y-4">
+            {Array.from({length: 3}).map((_, index) => (
+              <div
+                key={index}
+                className="h-40 rounded-lg bg-background-secondary animate-pulse"
+              />
+            ))}
+          </div>
+        ) : currentOrders.length ? (
+          <div className="space-y-4">
+            {currentOrders.map((order) => (
+              <OrderCard key={order.id} order={order} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-foreground-secondary">
+            Aún no tienes reservas activas.
+          </p>
+        )}
       </div>
 
-      {/* Past Orders */}
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-6">Mis reservas pasadas</h2>
-        <div className="space-y-4">
-          {PAST_ORDERS.map((order) => (
-            <OrderCard key={order.id} order={order} isPast />
-          ))}
-        </div>
+        <h2 className="text-2xl font-bold text-foreground mb-6">
+          Mis reservas pasadas
+        </h2>
+        {isLoading ? (
+          <div className="space-y-4">
+            {Array.from({length: 2}).map((_, index) => (
+              <div
+                key={index}
+                className="h-32 rounded-lg bg-background-secondary animate-pulse"
+              />
+            ))}
+          </div>
+        ) : pastOrders.length ? (
+          <div className="space-y-4">
+            {pastOrders.map((order) => (
+              <OrderCard key={order.id} order={order} isPast />
+            ))}
+          </div>
+        ) : (
+          <p className="text-foreground-secondary">
+            No registras reservas pasadas.
+          </p>
+        )}
       </div>
     </div>
-  )
+  );
 }

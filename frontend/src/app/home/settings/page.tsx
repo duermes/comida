@@ -1,30 +1,27 @@
 "use client";
 
-import type React from "react";
-
-import {useState} from "react";
+import {useEffect, useState} from "react";
+import {getProfile, type UsuarioPerfil} from "@/lib/api";
 
 export default function SettingsPage() {
-  const [formData, setFormData] = useState({
-    name: "Cristhian",
-    email: "cristhian@utp.edu.pe",
-    phone: "+51 987 654 321",
-    codigo: "CPacifico222257",
-    carrera: "Ingeniería de Sistemas",
-    ciclo: "VI",
-  });
+  const [profile, setProfile] = useState<UsuarioPerfil | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const {name, value} = e.target;
-    setFormData((prev) => ({...prev, [name]: value}));
-  };
+  useEffect(() => {
+    const loadProfile = async () => {
+      setIsLoading(true);
+      try {
+        const result = await getProfile();
+        setProfile(result);
+      } catch (error) {
+        console.error("Error al cargar perfil:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Datos guardados:", formData);
-  };
+    loadProfile();
+  }, []);
 
   return (
     <div className="p-8 max-w-2xl mx-auto">
@@ -32,112 +29,54 @@ export default function SettingsPage() {
 
       <div className="bg-white rounded-lg shadow-card p-8">
         <h2 className="text-xl font-bold text-foreground mb-6">
-          Datos Personales
+          Datos personales
         </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {isLoading ? (
+          <div className="space-y-4">
+            {Array.from({length: 4}).map((_, index) => (
+              <div
+                key={index}
+                className="h-12 rounded-md bg-background-secondary animate-pulse"
+              />
+            ))}
+          </div>
+        ) : profile ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Nombre Completo
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                disabled
-                className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Código UTP
-              </label>
-              <input
-                type="text"
-                name="codigo"
-                value={formData.codigo}
-                onChange={handleChange}
-                disabled
-                className="w-full px-4 py-3 border border-border rounded-lg bg-background-secondary text-foreground-secondary"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                disabled
-                className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Teléfono
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                disabled
-                className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Carrera
-              </label>
-              <input
-                type="text"
-                name="carrera"
-                value={formData.carrera}
-                onChange={handleChange}
-                disabled
-                className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Ciclo
-              </label>
-              <input
-                type="text"
-                name="ciclo"
-                value={formData.ciclo}
-                onChange={handleChange}
-                disabled
-                className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
+            <Field label="Nombre completo" value={profile.nombre} />
+            <Field
+              label="Código"
+              value={profile.codigoUsu ?? "No disponible"}
+            />
+            <Field label="Documento" value={profile.dni ?? "No registrado"} />
+            <Field label="Tipo" value={profile.tipo} />
+            <Field label="Rol" value={profile.rol} />
+            <Field label="Sede" value={profile.sede ?? "Sin sede"} />
           </div>
-
-          <div className="flex gap-4 pt-6 border-t border-border">
-            <button
-              type="submit"
-              className="flex-1 bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-lg transition-smooth"
-            >
-              Guardar Cambios
-            </button>
-            <button
-              type="button"
-              className="flex-1 bg-background-secondary hover:bg-border text-foreground font-semibold py-3 rounded-lg transition-smooth"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
+        ) : (
+          <p className="text-foreground-secondary">
+            No fue posible cargar tus datos.
+          </p>
+        )}
       </div>
     </div>
+  );
+}
+
+interface FieldProps {
+  label: string;
+  value: string;
+}
+
+function Field({label, value}: FieldProps) {
+  return (
+    <label className="block text-sm font-medium text-foreground">
+      <span className="mb-2 block">{label}</span>
+      <input
+        value={value}
+        readOnly
+        className="w-full px-4 py-3 border border-border rounded-lg bg-background-secondary text-foreground focus:outline-none"
+      />
+    </label>
   );
 }
