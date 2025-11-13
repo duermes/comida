@@ -1,16 +1,18 @@
 "use client";
 
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useState, type ChangeEvent} from "react";
 import {format} from "date-fns";
-import es from "date-fns/locale/es";
+import {es} from "date-fns/locale";
 import type {DisplayMenuItem} from "@/components/menu/menu-grid";
-import type {PedidoResponse} from "@/lib/api";
+import {Input} from "@/components/ui/input";
+import type {PedidoResponse, UsuarioPerfil} from "@/lib/api";
 import {crearPedido, registrarEncuesta} from "@/lib/api";
 
 interface ReservationSummaryProps {
   reservation: DisplayMenuItem;
   onClose: () => void;
   onOrderCreated?: (pedido: PedidoResponse) => void;
+  currentUser?: UsuarioPerfil | null;
 }
 
 type ExecutiveSelection = {
@@ -24,6 +26,7 @@ export default function ReservationSummary({
   reservation,
   onClose,
   onOrderCreated,
+  currentUser,
 }: ReservationSummaryProps) {
   const [executiveSelection, setExecutiveSelection] =
     useState<ExecutiveSelection>({});
@@ -32,16 +35,34 @@ export default function ReservationSummary({
   const [surveySubmitting, setSurveySubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [surveyFeedback, setSurveyFeedback] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState<number>(1);
+  const [scheduledDate, setScheduledDate] = useState<string>("");
 
   const menu = reservation.menu;
+  const isCoordinator = currentUser?.rol === "coordinador";
+  const maxQuantity = isCoordinator ? 100 : 5;
+  const todayISO = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
 
   const formattedDate = useMemo(() => {
+    if (!scheduledDate) {
+      try {
+        return format(new Date(menu.fecha), "PPP", {locale: es});
+      } catch (error) {
+        return "Fecha no disponible";
+      }
+    }
+
     try {
-      return format(new Date(menu.fecha), "PPP", {locale: es});
+      return format(new Date(scheduledDate), "PPP", {locale: es});
     } catch (error) {
       return "Fecha no disponible";
     }
-  }, [menu.fecha]);
+  }, [menu.fecha, scheduledDate]);
+
+  const total = useMemo(
+    () => reservation.price * quantity,
+    [reservation.price, quantity]
+  );
 
   useEffect(() => {
     if (reservation.variant === "ejecutivo") {
@@ -57,7 +78,14 @@ export default function ReservationSummary({
     setSurveySelection([]);
     setFeedback(null);
     setSurveyFeedback(null);
-  }, [reservation]);
+    try {
+      const initial = format(new Date(menu.fecha), "yyyy-MM-dd");
+      setScheduledDate(initial);
+    } catch (error) {
+      setScheduledDate("");
+    }
+    setQuantity(1);
+  }, [menu.ejecutivo, menu.fecha, reservation]);
 
   const handleExecutiveSelect = (
     field: keyof ExecutiveSelection,
@@ -75,17 +103,53 @@ export default function ReservationSummary({
     });
   };
 
+  const adjustQuantity = (delta: number) => {
+    setQuantity((prev) => {
+      const next = Math.max(1, Math.min(maxQuantity, prev + delta));
+      return next;
+    });
+  };
+
+  const handleQuantityInput = (event: ChangeEvent<HTMLInputElement>) => {
+    const {value} = event.target;
+    if (value === "") {
+      setQuantity(1);
+      return;
+    }
+
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+
+    const normalized = Math.floor(parsed);
+    const clamped = Math.max(1, Math.min(maxQuantity, normalized));
+    setQuantity(clamped);
+  };
+
   const handleCreateOrder = async () => {
+    if (quantity < 1) {
+      setFeedback("Selecciona una cantidad válida");
+      return;
+    }
+
+    const menuId = reservation.menuId;
+    if (!menuId) {
+      setFeedback("No se pudo identificar el menú seleccionado.");
+      return;
+    }
+
     setIsSubmitting(true);
     setFeedback(null);
     try {
       const pedido = await crearPedido({
         sede: menu.sede,
+        fechaEntrega: scheduledDate || undefined,
         items: [
           {
-            refId: menu._id,
+            refId: menuId,
             tipo: "menu",
-            cantidad: 1,
+            cantidad: quantity,
             precioUnitario: reservation.price,
           },
         ],
@@ -109,10 +173,16 @@ export default function ReservationSummary({
       return;
     }
 
+    const menuId = reservation.menuId;
+    if (!menuId) {
+      setSurveyFeedback("No se pudo registrar tu voto en este momento.");
+      return;
+    }
+
     setSurveySubmitting(true);
     setSurveyFeedback(null);
     try {
-      await registrarEncuesta(menu._id, surveySelection);
+      await registrarEncuesta(menuId, surveySelection);
       setSurveyFeedback("¡Gracias por votar!");
     } catch (error) {
       console.error("Error al registrar encuesta:", error);
@@ -193,16 +263,78 @@ export default function ReservationSummary({
         </div>
       )}
 
+      <div className="mb-6 space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-foreground">
+            Cantidad a reservar
+          </label>
+          <div className="mt-2 flex items-center rounded-lg border border-border overflow-hidden">
+            <button
+              type="button"
+              onClick={() => adjustQuantity(-1)}
+              className="h-11 w-11 bg-background-secondary text-lg font-semibold text-foreground hover:bg-background transition-smooth"
+              aria-label="Disminuir cantidad"
+            >
+              −
+            </button>
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={maxQuantity}
+              value={quantity}
+              onChange={handleQuantityInput}
+              className="h-11 w-full border-0 text-center text-base font-semibold"
+            />
+            <button
+              type="button"
+              onClick={() => adjustQuantity(1)}
+              className="h-11 w-11 bg-background-secondary text-lg font-semibold text-foreground hover:bg-background transition-smooth"
+              aria-label="Aumentar cantidad"
+            >
+              +
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-foreground-secondary">
+            {isCoordinator
+              ? `Puedes solicitar hasta ${maxQuantity} unidades por pedido.`
+              : `Máximo ${maxQuantity} unidades por pedido.`}
+          </p>
+        </div>
+
+        {isCoordinator && (
+          <div>
+            <label className="block text-sm font-medium text-foreground">
+              Programar fecha de entrega
+            </label>
+            <Input
+              type="date"
+              value={scheduledDate || ""}
+              min={todayISO}
+              onChange={(event) => setScheduledDate(event.target.value)}
+              className="mt-2"
+            />
+            <p className="mt-1 text-xs text-foreground-secondary">
+              Selecciona la fecha en la que se requiere el pedido masivo.
+            </p>
+          </div>
+        )}
+      </div>
+
       <div className="space-y-3 mb-6 pb-6 border-b border-border text-sm">
         <InfoRow label="Menú" value={reservation.title} />
         <InfoRow label="Comedor" value={menu.sede} />
         <InfoRow label="Fecha" value={formattedDate} />
+        <InfoRow
+          label="Cantidad"
+          value={`${quantity} unidad${quantity === 1 ? "" : "es"}`}
+        />
       </div>
 
       <div className="flex justify-between items-center mb-6 pb-6 border-b border-border">
         <span className="text-foreground-secondary">Subtotal:</span>
         <span className="text-xl font-bold text-primary">
-          S/ {reservation.price.toFixed(2)}
+          S/ {total.toFixed(2)}
         </span>
       </div>
 

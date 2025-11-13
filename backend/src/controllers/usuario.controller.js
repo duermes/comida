@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Usuario from "../models/usuario.model.js";
 import Menu from "../models/menu.model.js";
 import PlatoCarta from "../models/platosCarta.model.js";

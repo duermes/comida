@@ -1,8 +1,36 @@
 "use client";
 
-import {useEffect, useMemo, useState} from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import {useRouter} from "next/navigation";
-import {getPlatosMenu, type PlatoMenuItem} from "@/lib/api";
+import {
+  crearProducto,
+  getPlatosMenu,
+  type CrearProductoPayload,
+  type PlatoMenuItem,
+} from "@/lib/api";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const BASE_CATEGORIES: Array<PlatoMenuItem["tipo"]> = [
+  "entrada",
+  "segundo",
+  "postre",
+  "bebida",
+];
 
 function LoadingView() {
   return (
@@ -21,7 +49,17 @@ export default function ProductsPage() {
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [platos, setPlatos] = useState<PlatoMenuItem[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedSede, setSelectedSede] = useState("Todas");
+  const [selectedCategory, setSelectedCategory] = useState("Todos");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formState, setFormState] = useState<CrearProductoPayload>(
+    createEmptyProductForm()
+  );
 
   useEffect(() => {
     const stored =
@@ -48,41 +86,141 @@ export default function ProductsPage() {
     }
   }, [router]);
 
-  useEffect(() => {
+  const loadPlatos = useCallback(async () => {
     if (!authorized) return;
-
-    const loadPlatos = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await getPlatosMenu();
-        setPlatos(response);
-      } catch (err) {
-        console.error("Error al cargar platos:", err);
-        setError(
-          err instanceof Error ? err.message : "Error al cargar los platos"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadPlatos();
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getPlatosMenu();
+      setPlatos(response);
+    } catch (err) {
+      console.error("Error al cargar platos:", err);
+      setError(
+        err instanceof Error ? err.message : "Error al cargar los productos"
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [authorized]);
 
-  const groupedPlatos = useMemo(() => {
-    const map = new Map<string, PlatoMenuItem[]>();
-    for (const plato of platos) {
-      const key = plato.sede ?? "General";
-      const list = map.get(key) ?? [];
-      list.push(plato);
-      map.set(key, list);
-    }
-    return Array.from(map.entries()).map(([sede, items]) => ({
-      sede,
-      items: items.sort((a, b) => a.nombre.localeCompare(b.nombre)),
-    }));
+  useEffect(() => {
+    if (!authorized) return;
+    loadPlatos();
+  }, [authorized, loadPlatos]);
+
+  const sedeOptions = useMemo(() => {
+    const sedes = new Set<string>(["General"]);
+    platos.forEach((plato) => {
+      if (plato.sede) {
+        sedes.add(plato.sede);
+      }
+    });
+    return Array.from(sedes).sort((a, b) => a.localeCompare(b));
   }, [platos]);
+
+  const categoryOptions = useMemo(() => {
+    const categorias = new Set<string>(BASE_CATEGORIES);
+    platos.forEach((plato) => {
+      if (plato.tipo) {
+        categorias.add(plato.tipo);
+      }
+    });
+    return Array.from(categorias).sort((a, b) => a.localeCompare(b));
+  }, [platos]);
+
+  const filteredPlatos = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return platos
+      .filter((plato) => {
+        if (selectedSede !== "Todas" && plato.sede !== selectedSede) {
+          return false;
+        }
+        if (selectedCategory !== "Todos" && plato.tipo !== selectedCategory) {
+          return false;
+        }
+        if (!term) return true;
+        const haystack = `${plato.nombre} ${plato.descripcion ?? ""} ${
+          plato.sede ?? ""
+        } ${plato.tipo}`.toLowerCase();
+        return haystack.includes(term);
+      })
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [platos, searchTerm, selectedSede, selectedCategory]);
+
+  const handleFormInput = (
+    field: keyof CrearProductoPayload,
+    value: string | number | boolean
+  ) => {
+    setFormState((prev) => ({...prev, [field]: value}));
+  };
+
+  const handleProductInputChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const target = event.target;
+    const {name} = target;
+    if (!name) return;
+
+    if (target instanceof HTMLInputElement) {
+      if (target.type === "number") {
+        const parsed = Number(target.value);
+        handleFormInput(
+          name as keyof CrearProductoPayload,
+          Number.isNaN(parsed) ? 0 : Math.max(0, parsed)
+        );
+        return;
+      }
+      if (target.type === "checkbox") {
+        handleFormInput(name as keyof CrearProductoPayload, target.checked);
+        return;
+      }
+    }
+
+    handleFormInput(name as keyof CrearProductoPayload, target.value);
+  };
+
+  const handleCreateProduct = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFormError(null);
+    setSuccessMessage(null);
+
+    if (!formState.nombre || !formState.sede || !formState.tipo) {
+      setFormError("Completa los campos obligatorios marcados con *");
+      return;
+    }
+
+    if (typeof formState.stock !== "number" || Number.isNaN(formState.stock)) {
+      setFormError("Ingresa un stock válido");
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      await crearProducto(formState);
+      setSuccessMessage(`Producto ${formState.nombre} añadido correctamente.`);
+      setShowAddModal(false);
+      setFormState(createEmptyProductForm());
+      await loadPlatos();
+    } catch (err) {
+      console.error("Error al crear producto:", err);
+      setFormError(
+        err instanceof Error ? err.message : "No se pudo registrar el producto"
+      );
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const openAddModal = () => {
+    setFormError(null);
+    setShowAddModal(true);
+    setFormState(createEmptyProductForm());
+  };
+
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setFormError(null);
+  };
 
   if (checkingAuth) {
     return <LoadingView />;
@@ -100,9 +238,60 @@ export default function ProductsPage() {
             Gestión de productos
           </h1>
           <p className="text-sm text-foreground-secondary">
-            Lista de platos disponibles en cada sede.
+            Gestiona los platos disponibles y mantén el inventario actualizado.
           </p>
         </header>
+
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex-1 min-w-64 max-w-md">
+            <Input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Buscar por nombre, sede o categoría"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={selectedSede} onValueChange={setSelectedSede}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Seleccionar sede" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todas">Todas</SelectItem>
+                {sedeOptions.map((sede) => (
+                  <SelectItem key={sede} value={sede}>
+                    {sede}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={selectedCategory}
+              onValueChange={setSelectedCategory}
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Seleccionar categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todos">Todas</SelectItem>
+                {categoryOptions.map((categoria) => (
+                  <SelectItem key={categoria} value={categoria}>
+                    {categoria}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button onClick={openAddModal}>Añadir producto</Button>
+          </div>
+        </div>
+
+        {successMessage && (
+          <div className="rounded-lg border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
+            {successMessage}
+          </div>
+        )}
 
         {error && (
           <div className="rounded-lg border border-error/20 bg-error/10 px-4 py-3 text-error">
@@ -112,83 +301,227 @@ export default function ProductsPage() {
 
         {loading ? (
           <LoadingView />
+        ) : platos.length === 0 ? (
+          <div className="rounded-lg border border-border bg-muted/40 p-6 text-center text-sm text-foreground-secondary">
+            No se encontraron productos registrados.
+          </div>
+        ) : filteredPlatos.length === 0 ? (
+          <div className="rounded-lg border border-border bg-muted/40 p-6 text-center text-sm text-foreground-secondary">
+            No se encontraron coincidencias para "{searchTerm}".
+          </div>
         ) : (
-          <div className="space-y-8">
-            {groupedPlatos.map(({sede, items}) => (
-              <section key={sede} className="space-y-4">
-                <div>
-                  <h2 className="text-xl font-semibold text-foreground">
-                    {sede}
-                  </h2>
-                  <p className="text-xs text-foreground-secondary">
-                    {items.length} plato{items.length === 1 ? "" : "s"}{" "}
-                    registrados
-                  </p>
-                </div>
-                <div className="overflow-hidden rounded-xl border border-border bg-white">
-                  <table className="min-w-full divide-y divide-border text-sm">
-                    <thead className="bg-muted/60">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-medium text-foreground-secondary">
-                          Nombre
-                        </th>
-                        <th className="px-4 py-3 text-left font-medium text-foreground-secondary">
-                          Tipo
-                        </th>
-                        <th className="px-4 py-3 text-left font-medium text-foreground-secondary">
-                          Stock
-                        </th>
-                        <th className="px-4 py-3 text-left font-medium text-foreground-secondary">
-                          Estado
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {items.map((plato) => (
-                        <tr key={plato._id} className="hover:bg-muted/40">
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-foreground">
-                              {plato.nombre}
-                            </div>
-                            {plato.descripcion && (
-                              <p className="text-xs text-foreground-secondary">
-                                {plato.descripcion}
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 capitalize text-foreground-secondary">
-                            {plato.tipo}
-                          </td>
-                          <td className="px-4 py-3 text-foreground-secondary">
-                            {plato.stock}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                                plato.activo
-                                  ? "bg-success/10 text-success"
-                                  : "bg-error/10 text-error"
-                              }`}
-                            >
-                              {plato.activo ? "Activo" : "Inactivo"}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            ))}
+          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            {filteredPlatos.map((plato) => {
+              const key = plato._id ?? plato.nombre;
+              const imageSrc = plato.imagenUrl ?? "";
+              return (
+                <article
+                  key={key}
+                  className="flex h-full flex-col rounded-2xl border border-border bg-white p-5 shadow-sm transition-smooth hover:shadow-lg"
+                >
+                  {imageSrc && (
+                    <div className="mb-4 h-40 overflow-hidden rounded-xl bg-muted">
+                      <img
+                        src={imageSrc}
+                        alt={plato.nombre}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
 
-            {groupedPlatos.length === 0 && (
-              <div className="rounded-lg border border-border bg-muted/40 p-6 text-center text-sm text-foreground-secondary">
-                No se encontraron platos registrados.
-              </div>
-            )}
+                  <div className="flex flex-1 flex-col gap-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground">
+                          {plato.nombre}
+                        </h3>
+                        <p className="text-xs uppercase text-foreground-secondary">
+                          {plato.sede ?? "General"}
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex min-w-[88px] justify-center rounded-full px-3 py-1 text-xs font-medium ${
+                          plato.activo
+                            ? "bg-success/10 text-success"
+                            : "bg-error/10 text-error"
+                        }`}
+                      >
+                        {plato.activo ? "Activo" : "Inactivo"}
+                      </span>
+                    </div>
+
+                    {plato.descripcion && (
+                      <p className="line-clamp-3 text-sm text-foreground-secondary">
+                        {plato.descripcion}
+                      </p>
+                    )}
+
+                    <div className="mt-auto flex flex-wrap items-center gap-2 text-xs font-medium text-foreground-secondary">
+                      <span className="rounded-full bg-muted px-2 py-1 capitalize">
+                        {plato.tipo}
+                      </span>
+                      <span className="rounded-full bg-muted px-2 py-1">
+                        Stock: {plato.stock}
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-foreground">
+                Añadir producto
+              </h2>
+              <button
+                onClick={closeAddModal}
+                className="text-foreground-secondary hover:text-foreground transition-smooth text-2xl"
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProduct} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Nombre*
+                  </label>
+                  <Input
+                    name="nombre"
+                    value={formState.nombre}
+                    onChange={handleProductInputChange}
+                    placeholder="Ej. Lomo saltado"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Sede*
+                  </label>
+                  <Input
+                    name="sede"
+                    value={formState.sede ?? ""}
+                    onChange={handleProductInputChange}
+                    placeholder="Ej. Lima Centro"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Categoría*
+                  </label>
+                  <Select
+                    value={formState.tipo}
+                    onValueChange={(value) =>
+                      handleFormInput("tipo", value as PlatoMenuItem["tipo"])
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categoryOptions.map((categoria) => (
+                        <SelectItem key={categoria} value={categoria}>
+                          {categoria}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Stock*
+                  </label>
+                  <Input
+                    name="stock"
+                    type="number"
+                    min={0}
+                    value={formState.stock}
+                    onChange={handleProductInputChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Descripción
+                  </label>
+                  <textarea
+                    name="descripcion"
+                    value={formState.descripcion ?? ""}
+                    onChange={handleProductInputChange}
+                    placeholder="Detalles del plato"
+                    className="w-full min-h-24 resize-y rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="text-sm font-medium text-foreground">
+                    URL de imagen
+                  </label>
+                  <Input
+                    name="imagenUrl"
+                    value={formState.imagenUrl ?? ""}
+                    onChange={handleProductInputChange}
+                    placeholder="https://..."
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <input
+                      type="checkbox"
+                      name="activo"
+                      checked={formState.activo ?? true}
+                      onChange={handleProductInputChange}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    Producto activo
+                  </label>
+                </div>
+              </div>
+
+              {formError && (
+                <div className="rounded-lg border border-error/20 bg-error/10 px-4 py-3 text-sm text-error">
+                  {formError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeAddModal}
+                  className="border-border text-foreground"
+                  disabled={isCreating}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isCreating}>
+                  {isCreating ? "Guardando..." : "Guardar"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function createEmptyProductForm(): CrearProductoPayload {
+  return {
+    nombre: "",
+    descripcion: "",
+    tipo: BASE_CATEGORIES[0],
+    sede: "",
+    stock: 0,
+    imagenUrl: "",
+    activo: true,
+  };
 }

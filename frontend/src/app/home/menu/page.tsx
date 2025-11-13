@@ -10,6 +10,7 @@ import {
   toggleFavorito,
   type FavoritoResponse,
   type PopulatedMenu,
+  type UsuarioPerfil,
 } from "@/lib/api";
 
 const CATEGORY_OPTIONS = [
@@ -22,6 +23,7 @@ export default function MenuPage() {
   const [availableSedes, setAvailableSedes] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [selectedSede, setSelectedSede] = useState("Todas");
+  const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>(
     CATEGORY_OPTIONS[0].value
   );
@@ -30,20 +32,47 @@ export default function MenuPage() {
   const [loadingMenus, setLoadingMenus] = useState(true);
   const [loadingFavorites, setLoadingFavorites] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<UsuarioPerfil | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("user");
+    if (!stored) return;
+    try {
+      const parsed: UsuarioPerfil = JSON.parse(stored);
+      setCurrentUser(parsed);
+    } catch (err) {
+      console.error(
+        "Error al cargar el usuario desde almacenamiento local:",
+        err
+      );
+    }
+  }, []);
 
   useEffect(() => {
     const loadMenus = async () => {
       setLoadingMenus(true);
       setError(null);
       try {
-        const response = await getMenus(
-          selectedSede === "Todas" ? {} : {sede: selectedSede}
-        );
+        const query: {sede?: string; fecha?: string} = {};
+        if (selectedSede !== "Todas") {
+          query.sede = selectedSede;
+        }
+        if (selectedDate) {
+          query.fecha = selectedDate;
+        }
+
+        const response = await getMenus(query);
         setMenus(response);
-        const sedes = Array.from(
-          new Set(response.map((menu) => menu.sede))
-        ).sort();
-        setAvailableSedes(sedes);
+        setAvailableSedes((prev) => {
+          const next = new Set(prev);
+          response.forEach((menu) => {
+            if (menu.sede) {
+              next.add(menu.sede);
+            }
+          });
+          return Array.from(next).sort((a, b) => a.localeCompare(b));
+        });
       } catch (err) {
         console.error("Error al obtener menús:", err);
         setError(
@@ -55,7 +84,7 @@ export default function MenuPage() {
     };
 
     loadMenus();
-  }, [selectedSede]);
+  }, [selectedSede, selectedDate]);
 
   useEffect(() => {
     const loadFavorites = async () => {
@@ -67,7 +96,8 @@ export default function MenuPage() {
             (fav): fav is FavoritoResponse & {tipo: "menu"} =>
               fav.tipo === "menu"
           )
-          .map((fav) => fav.refId);
+          .map((fav) => String(fav.refId ?? "").trim())
+          .filter((value) => value.length > 0);
         setFavorites(new Set(favoriteMenus));
       } catch (err) {
         console.error("Error al obtener favoritos:", err);
@@ -89,14 +119,22 @@ export default function MenuPage() {
   }, [favorites]);
 
   const handleToggleFavorite = async (menuId: string) => {
+    const normalizedId = String(menuId ?? "").trim();
+    if (!normalizedId) {
+      console.warn(
+        "Se intentó actualizar un favorito sin identificador de menú"
+      );
+      return;
+    }
+
     try {
-      await toggleFavorito(menuId, "menu");
+      await toggleFavorito(normalizedId, "menu");
       setFavorites((prev) => {
         const next = new Set(prev);
-        if (next.has(menuId)) {
-          next.delete(menuId);
+        if (next.has(normalizedId)) {
+          next.delete(normalizedId);
         } else {
-          next.add(menuId);
+          next.add(normalizedId);
         }
         return next;
       });
@@ -111,11 +149,16 @@ export default function MenuPage() {
     return menus
       .filter((menu) => menu.activo)
       .flatMap<DisplayMenuItem>((menu) => {
+        const rawMenuId = menu._id ?? menu.id;
+        const menuId = rawMenuId ? String(rawMenuId).trim() : "";
+        if (!menuId) {
+          return [];
+        }
         const formattedDate = new Date(menu.fecha).toLocaleDateString();
 
         const normalCard: DisplayMenuItem = {
-          id: `${menu._id}-normal`,
-          menuId: menu._id,
+          id: `${menuId}-normal`,
+          menuId,
           variant: "normal",
           title: `Menú universitario - ${formattedDate}`,
           description: [
@@ -129,7 +172,7 @@ export default function MenuPage() {
           image:
             menu.normal.segundo?.imagenUrl ?? menu.normal.entrada?.imagenUrl,
           sede: menu.sede,
-          isFavorite: favorites.has(menu._id),
+          isFavorite: favorites.has(menuId),
           menu,
         };
 
@@ -151,8 +194,8 @@ export default function MenuPage() {
           .join(" • ");
 
         const executiveCard: DisplayMenuItem = {
-          id: `${menu._id}-ejecutivo`,
-          menuId: menu._id,
+          id: `${menuId}-ejecutivo`,
+          menuId,
           variant: "ejecutivo",
           title: `Menú ejecutivo - ${formattedDate}`,
           description: executiveDescription,
@@ -161,7 +204,7 @@ export default function MenuPage() {
             menu.ejecutivo.segundos?.[0]?.imagenUrl ??
             menu.normal.segundo?.imagenUrl,
           sede: menu.sede,
-          isFavorite: favorites.has(menu._id),
+          isFavorite: favorites.has(menuId),
           menu,
         };
 
@@ -213,9 +256,12 @@ export default function MenuPage() {
             selectedSede={selectedSede}
             selectedCategory={selectedCategory}
             searchTerm={searchTerm}
+            selectedDate={selectedDate}
             onSedeChange={setSelectedSede}
             onCategoryChange={setSelectedCategory}
             onSearchChange={setSearchTerm}
+            onDateChange={setSelectedDate}
+            showDatePicker={currentUser?.rol === "coordinador"}
           />
 
           <MenuGrid
@@ -231,6 +277,7 @@ export default function MenuPage() {
         <ReservationSummary
           reservation={reservation}
           onClose={() => setReservation(null)}
+          currentUser={currentUser}
         />
       )}
     </div>

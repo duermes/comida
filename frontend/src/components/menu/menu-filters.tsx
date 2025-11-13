@@ -21,9 +21,12 @@ interface MenuFiltersProps {
   selectedSede: string;
   selectedCategory: string;
   searchTerm: string;
+  selectedDate?: string;
+  showDatePicker?: boolean;
   onSedeChange: (sede: string) => void;
   onCategoryChange: (category: string) => void;
   onSearchChange: (query: string) => void;
+  onDateChange?: (date: string) => void;
 }
 
 export default function MenuFilters({
@@ -32,9 +35,12 @@ export default function MenuFilters({
   selectedSede,
   selectedCategory,
   searchTerm,
+  selectedDate,
+  showDatePicker = false,
   onSedeChange,
   onCategoryChange,
   onSearchChange,
+  onDateChange,
 }: MenuFiltersProps) {
   const availableSedes = sedes.length ? sedes : ["Todas"];
 
@@ -58,6 +64,20 @@ export default function MenuFilters({
             className="pl-10"
           />
         </div>
+
+        {showDatePicker && (
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-medium text-foreground-secondary">
+              Seleccionar fecha
+            </label>
+            <Input
+              type="date"
+              value={selectedDate ?? ""}
+              onChange={(event) => onDateChange?.(event.target.value)}
+              className="w-48"
+            />
+          </div>
+        )}
 
         <Select value={selectedSede} onValueChange={onSedeChange}>
           <SelectTrigger className="w-48">

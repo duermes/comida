@@ -111,7 +111,8 @@ export interface PopulatedPlatoMenu {
 }
 
 export interface PopulatedMenu {
-  _id: string;
+  _id?: string;
+  id?: string;
   fecha: string;
   sede: string;
   precioNormal: number;
@@ -133,6 +134,8 @@ export interface PopulatedMenu {
 export interface PedidoResponse {
   _id: string;
   usuarioId: string;
+  usuarioNombre?: string;
+  usuarioCorreo?: string;
   sede: string;
   items: Array<{
     refId: string;
@@ -188,6 +191,7 @@ export interface UsuarioItem {
   codigoUsu?: string;
   dni?: string;
   sede?: string;
+  correo?: string;
   activo: boolean;
 }
 
@@ -253,10 +257,12 @@ export async function crearPedido(payload: {
     cantidad: number;
     precioUnitario: number;
   }>;
+  fechaEntrega?: string;
 }) {
+  const body = JSON.stringify(payload);
   return request<PedidoResponse>("/api/pedidos", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body,
   });
 }
 
@@ -265,12 +271,16 @@ export async function getFavoritos() {
 }
 
 export async function toggleFavorito(refId: string, tipo: "menu" | "carta") {
+  const normalizedRefId = String(refId).trim();
+  if (!normalizedRefId) {
+    throw new Error("El identificador del favorito es obligatorio.");
+  }
   return request<{
     action: "added" | "removed";
     favoritos: Array<{refId: string; tipo: string}>;
   }>("/api/usuarios/me/favoritos", {
     method: "POST",
-    body: JSON.stringify({refId, tipo}),
+    body: JSON.stringify({refId: normalizedRefId, tipo}),
   });
 }
 
@@ -293,6 +303,41 @@ export async function getUsuarios(params: {activo?: boolean} = {}) {
   const qs = query.toString();
   const path = qs ? `/api/usuarios?${qs}` : "/api/usuarios";
   return request<UsuarioItem[]>(path);
+}
+
+export interface CrearUsuarioPayload {
+  nombre: string;
+  correo: string;
+  rol: string;
+  tipo: string;
+  identificador: string;
+  password: string;
+  sede?: string;
+}
+
+export async function crearUsuario(payload: CrearUsuarioPayload) {
+  return request<UsuarioItem>("/api/usuarios", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface CrearProductoPayload {
+  nombre: string;
+  descripcion?: string;
+  tipo: PlatoMenuItem["tipo"];
+  sede: string;
+  stock: number;
+  precio?: number;
+  imagenUrl?: string;
+  activo?: boolean;
+}
+
+export async function crearProducto(payload: CrearProductoPayload) {
+  return request<PlatoMenuItem>("/api/platos-menu", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function getResultadosEncuestas(params: {sede?: string} = {}) {
