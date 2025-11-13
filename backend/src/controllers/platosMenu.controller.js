@@ -32,17 +32,28 @@ class PlatoMenuController {
       const usuario = req.user;
       if (!usuario) return reply.code(401).send({ error: "No autenticado" });
 
+      // Permitir a administradores ver todos los platos
       if (usuario.rol === ROLES.ADMIN) {
         const platos = await PlatoMenu.find();
         return reply.send(platos);
       }
 
+      // Obtener sede opcional desde query (frontend puede pasar ?sede=xxx)
+      const { sede } = req.query || {};
+
+      // Coordinadores ven platos de su sede
       if (usuario.rol === ROLES.COORD) {
         const platos = await PlatoMenu.find({ sede: usuario.sede });
         return reply.send(platos);
       }
 
-      return reply.code(403).send({ error: "Solo personal autorizado" });
+      // Usuarios autenticados pueden listar platos si se solicita una sede
+      if (sede) {
+        const platos = await PlatoMenu.find({ sede });
+        return reply.send(platos);
+      }
+
+      return reply.code(403).send({ error: "Debes especificar una sede para listar platos" });
 
     } catch (error) {
       reply.code(500).send({ error: "Error al listar platos" });

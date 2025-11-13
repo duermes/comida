@@ -5,8 +5,8 @@ import {format} from "date-fns";
 import {es} from "date-fns/locale";
 import type {DisplayMenuItem} from "@/components/menu/menu-grid";
 import {Input} from "@/components/ui/input";
-import type {PedidoResponse, UsuarioPerfil} from "@/lib/api";
-import {crearPedido, registrarEncuesta} from "@/lib/api";
+import type {PedidoResponse, UsuarioPerfil, PlatoMenuItem} from "@/lib/api";
+import {crearPedido, registrarEncuesta, getPlatosMenu} from "@/lib/api";
 
 interface ReservationSummaryProps {
   reservation: DisplayMenuItem;
@@ -65,6 +65,7 @@ export default function ReservationSummary({
   );
 
   useEffect(() => {
+    // Inicializar selección tanto para menú ejecutivo como normal
     if (reservation.variant === "ejecutivo") {
       setExecutiveSelection({
         entrada: menu.ejecutivo.entradas?.[0]?._id,
@@ -73,7 +74,12 @@ export default function ReservationSummary({
         bebida: menu.ejecutivo.bebidas?.[0]?._id,
       });
     } else {
-      setExecutiveSelection({});
+      // Para menús 'normal' construimos selecciones a partir de los platos fijos
+      setExecutiveSelection({
+        entrada: menu.normal?.entrada?._id,
+        segundo: menu.normal?.segundo?._id,
+        bebida: menu.normal?.bebida?._id,
+      });
     }
     setSurveySelection([]);
     setFeedback(null);
@@ -201,6 +207,52 @@ export default function ReservationSummary({
     bebidas: [],
   };
 
+  // Para menús 'normal' convertimos los campos individuales en arrays
+  const [normalPool, setNormalPool] =
+    useState<{
+      entradas: PlatoMenuItem[];
+      segundos: PlatoMenuItem[];
+      postres: PlatoMenuItem[];
+      bebidas: PlatoMenuItem[];
+    }>({entradas: [], segundos: [], postres: [], bebidas: []});
+
+  // Construir opciones para normal a partir del pool de platos por sede
+  const normalOptions = {
+    entradas: normalPool.entradas,
+    segundos: normalPool.segundos,
+    postres: normalPool.postres,
+    bebidas: normalPool.bebidas,
+  };
+
+  const selectionOptions =
+    reservation.variant === "ejecutivo" ? executiveOptions : normalOptions;
+
+  // Cargar pool de platos (solo para menús 'normal')
+  useEffect(() => {
+    let mounted = true;
+    async function loadPlatos() {
+      if (reservation.variant !== "normal") return;
+      try {
+        const platos = await getPlatosMenu({sede: menu.sede});
+        if (!mounted) return;
+        // Filtrar por sede y activos
+        const filtered = platos.filter((p) => p.sede === menu.sede && p.activo);
+        const entradas = filtered.filter((p) => p.tipo === "entrada");
+        const segundos = filtered.filter((p) => p.tipo === "segundo");
+        const postres = filtered.filter((p) => p.tipo === "postre");
+        const bebidas = filtered.filter((p) => p.tipo === "bebida");
+        setNormalPool({entradas, segundos, postres, bebidas});
+      } catch (error) {
+        console.error("Error cargando platos para opciones normales:", error);
+      }
+    }
+
+    loadPlatos();
+    return () => {
+      mounted = false;
+    };
+  }, [reservation.variant, menu.sede]);
+
   return (
     <aside className="w-96 bg-white border-l border-border overflow-auto p-6 flex flex-col">
       <div className="flex items-center justify-between mb-6">
@@ -216,52 +268,35 @@ export default function ReservationSummary({
         </button>
       </div>
 
-      {reservation.variant === "ejecutivo" && (
-        <div className="space-y-4 mb-6">
-          <SelectField
-            label="Seleccionar entrada"
-            value={executiveSelection.entrada ?? ""}
-            options={executiveOptions.entradas}
-            onChange={(value) => handleExecutiveSelect("entrada", value)}
-          />
-          <SelectField
-            label="Seleccionar segundo"
-            value={executiveSelection.segundo ?? ""}
-            options={executiveOptions.segundos}
-            onChange={(value) => handleExecutiveSelect("segundo", value)}
-          />
+      {/* Mostrar campos de selección para ambos tipos de menú */}
+      <div className="space-y-4 mb-6">
+        <SelectField
+          label="Seleccionar entrada"
+          value={executiveSelection.entrada ?? ""}
+          options={selectionOptions.entradas}
+          onChange={(value) => handleExecutiveSelect("entrada", value)}
+        />
+        <SelectField
+          label="Seleccionar segundo"
+          value={executiveSelection.segundo ?? ""}
+          options={selectionOptions.segundos}
+          onChange={(value) => handleExecutiveSelect("segundo", value)}
+        />
+        {selectionOptions.postres.length > 0 && (
           <SelectField
             label="Seleccionar postre"
             value={executiveSelection.postre ?? ""}
-            options={executiveOptions.postres}
+            options={selectionOptions.postres}
             onChange={(value) => handleExecutiveSelect("postre", value)}
           />
-          <SelectField
-            label="Seleccionar bebida"
-            value={executiveSelection.bebida ?? ""}
-            options={executiveOptions.bebidas}
-            onChange={(value) => handleExecutiveSelect("bebida", value)}
-          />
-        </div>
-      )}
-
-      {reservation.variant === "normal" && (
-        <div className="mb-6 space-y-2">
-          {[menu.normal.entrada, menu.normal.segundo, menu.normal.bebida]
-            .filter(Boolean)
-            .map((item) => (
-              <div
-                key={item._id}
-                className="flex items-center justify-between text-sm text-foreground"
-              >
-                <span className="text-foreground-secondary capitalize">
-                  {item.tipo}
-                </span>
-                <span className="font-medium">{item.nombre}</span>
-              </div>
-            ))}
-        </div>
-      )}
+        )}
+        <SelectField
+          label="Seleccionar bebida"
+          value={executiveSelection.bebida ?? ""}
+          options={selectionOptions.bebidas}
+          onChange={(value) => handleExecutiveSelect("bebida", value)}
+        />
+      </div>
 
       <div className="mb-6 space-y-4">
         <div>

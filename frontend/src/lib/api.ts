@@ -321,8 +321,9 @@ export async function registrarEncuesta(menuId: string, opciones: string[]) {
   });
 }
 
-export async function getPlatosMenu() {
-  return request<PlatoMenuItem[]>("/api/platos-menu");
+export async function getPlatosMenu(params: {sede?: string} = {}) {
+  const qs = params.sede ? `?sede=${encodeURIComponent(params.sede)}` : "";
+  return request<PlatoMenuItem[]>(`/api/platos-menu${qs}`);
 }
 
 export async function getUsuarios(params: {activo?: boolean} = {}) {
