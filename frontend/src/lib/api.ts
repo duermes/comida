@@ -307,12 +307,11 @@ export async function getUsuarios(params: {activo?: boolean} = {}) {
 
 export interface CrearUsuarioPayload {
   nombre: string;
-  correo: string;
-  rol: string;
-  tipo: string;
-  identificador: string;
   password: string;
-  sede?: string;
+  tipo: string;
+  codigoUsu: string;
+  dni: string;
+  rol: string;
 }
 
 export async function crearUsuario(payload: CrearUsuarioPayload) {

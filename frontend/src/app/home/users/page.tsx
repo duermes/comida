@@ -110,8 +110,6 @@ export default function UsersPage() {
         usuario.tipo,
         usuario.codigoUsu,
         usuario.dni,
-        usuario.sede,
-        usuario.correo,
       ];
 
       return values.some((value) =>
@@ -125,21 +123,13 @@ export default function UsersPage() {
     usuarios.forEach((usuario) => {
       if (usuario.rol) roles.add(usuario.rol);
     });
-    ["admin", "coordinador", "estudiante"].forEach((rol) => roles.add(rol));
     return Array.from(roles).sort((a, b) => a.localeCompare(b));
   }, [usuarios]);
 
   const typeOptions = useMemo(() => {
-    const tipos = new Set<string>();
-    usuarios.forEach((usuario) => {
-      if (usuario.tipo) tipos.add(usuario.tipo);
-    });
-    ["estudiante", "coordinador", "docente", "administrativo"].forEach((tipo) =>
-      tipos.add(tipo)
-    );
-    return Array.from(tipos).sort((a, b) => a.localeCompare(b));
+    const roles = ["interno", "estudiante"]
+    return Array.from(roles).sort((a, b) => a.localeCompare(b));
   }, [usuarios]);
-
   const handleFormInput = (field: keyof CrearUsuarioPayload, value: string) => {
     setFormState((prev) => ({...prev, [field]: value}));
   };
@@ -154,7 +144,7 @@ export default function UsersPage() {
     setFormError(null);
     setSuccessMessage(null);
 
-    if (!formState.nombre || !formState.correo || !formState.password) {
+    if (!formState.nombre || !formState.codigoUsu || !formState.password) {
       setFormError("Completa los campos obligatorios marcados con *");
       return;
     }
@@ -164,7 +154,7 @@ export default function UsersPage() {
       return;
     }
 
-    if (!formState.identificador) {
+    if (!formState.dni) {
       setFormError("Ingresa un identificador único para el usuario");
       return;
     }
@@ -273,9 +263,6 @@ export default function UsersPage() {
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">
                     Identificador
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">
-                    Correo
-                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
@@ -299,9 +286,6 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-3 text-foreground-secondary">
                       {usuario.codigoUsu ?? usuario.dni ?? "-"}
-                    </td>
-                    <td className="px-4 py-3 text-foreground-secondary">
-                      {usuario.correo ?? "-"}
                     </td>
                   </tr>
                 ))}
@@ -331,7 +315,7 @@ export default function UsersPage() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
-                    Nombre completo*
+                    Nombre completo
                   </label>
                   <Input
                     name="nombre"
@@ -343,12 +327,11 @@ export default function UsersPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
-                    Correo electrónico*
+                    Código
                   </label>
                   <Input
-                    name="correo"
-                    type="email"
-                    value={formState.correo}
+                    name="codigoUsu"
+                    value={formState.codigoUsu}
                     onChange={handleInputChange}
                     placeholder="usuario@dominio.com"
                     required
@@ -356,7 +339,7 @@ export default function UsersPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
-                    Rol*
+                    Rol
                   </label>
                   <Select
                     value={formState.rol}
@@ -376,7 +359,7 @@ export default function UsersPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
-                    Tipo*
+                    Tipo
                   </label>
                   <Select
                     value={formState.tipo}
@@ -396,27 +379,17 @@ export default function UsersPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
-                    Identificador*
+                    Identificador (DNI o código)
                   </label>
                   <Input
-                    name="identificador"
-                    value={formState.identificador}
+                    name="dni"
+                    value={formState.dni}
                     onChange={handleInputChange}
                     placeholder="Código UTP o DNI"
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Sede
-                  </label>
-                  <Input
-                    name="sede"
-                    value={formState.sede ?? ""}
-                    onChange={handleInputChange}
-                    placeholder="Ej. Lima Centro"
-                  />
-                </div>
+
                 <div className="space-y-2 sm:col-span-2">
                   <label className="text-sm font-medium text-foreground">
                     Contraseña temporal*
@@ -463,11 +436,10 @@ export default function UsersPage() {
 function createEmptyUserForm(): CrearUsuarioPayload {
   return {
     nombre: "",
-    correo: "",
-    rol: "",
-    tipo: "",
-    identificador: "",
     password: "",
-    sede: "",
+    tipo: '',
+    codigoUsu: "",
+    dni: "",
+    rol: "",
   };
 }
