@@ -12,6 +12,7 @@ import {useRouter} from "next/navigation";
 import {
   crearProducto,
   getPlatosMenu,
+  actualizarProducto,
   type CrearProductoPayload,
   type PlatoMenuItem,
 } from "@/lib/api";
@@ -26,10 +27,10 @@ import {
 } from "@/components/ui/select";
 
 const BASE_CATEGORIES: Array<PlatoMenuItem["tipo"]> = [
-  "entrada",
-  "segundo",
-  "postre",
   "bebida",
+  "postre",
+  "piqueo",
+  "entrada",
 ];
 
 function LoadingView() {
@@ -108,15 +109,8 @@ export default function ProductsPage() {
     loadPlatos();
   }, [authorized, loadPlatos]);
 
-  const sedeOptions = useMemo(() => {
-    const sedes = new Set<string>(["General"]);
-    platos.forEach((plato) => {
-      if (plato.sede) {
-        sedes.add(plato.sede);
-      }
-    });
-    return Array.from(sedes).sort((a, b) => a.localeCompare(b));
-  }, [platos]);
+  // For product creation we only allow two fixed sedes
+  const sedeOptions = useMemo(() => ["Lima Centro", "Arequipa"], []);
 
   const categoryOptions = useMemo(() => {
     const categorias = new Set<string>(BASE_CATEGORIES);
@@ -339,15 +333,38 @@ export default function ProductsPage() {
                           {plato.sede ?? "General"}
                         </p>
                       </div>
-                      <span
-                        className={`inline-flex min-w-[88px] justify-center rounded-full px-3 py-1 text-xs font-medium ${
-                          plato.activo
-                            ? "bg-success/10 text-success"
-                            : "bg-error/10 text-error"
-                        }`}
-                      >
-                        {plato.activo ? "Activo" : "Inactivo"}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`inline-flex min-w-[88px] justify-center rounded-full px-3 py-1 text-xs font-medium ${
+                            plato.activo
+                              ? "bg-success/10 text-success"
+                              : "bg-error/10 text-error"
+                          }`}
+                        >
+                          {plato.activo ? "Activo" : "Inactivo"}
+                        </span>
+                        <button
+                          onClick={async () => {
+                            try {
+                              // disable while toggling by simple optimistic UI
+                              const next = !plato.activo;
+                              await actualizarProducto(plato._id, {
+                                activo: next,
+                              });
+                              // refresh list
+                              await loadPlatos();
+                            } catch (err) {
+                              console.error(
+                                "Error al cambiar estado del producto:",
+                                err
+                              );
+                            }
+                          }}
+                          className="rounded-md border border-border px-3 py-1 text-xs text-foreground hover:bg-muted/30"
+                        >
+                          {plato.activo ? "Desactivar" : "Activar"}
+                        </button>
+                      </div>
                     </div>
 
                     {plato.descripcion && (
@@ -406,13 +423,22 @@ export default function ProductsPage() {
                   <label className="text-sm font-medium text-foreground">
                     Sede*
                   </label>
-                  <Input
-                    name="sede"
+                  <Select
                     value={formState.sede ?? ""}
-                    onChange={handleProductInputChange}
-                    placeholder="Ej. Lima Centro"
-                    required
-                  />
+                    onValueChange={(value) => handleFormInput("sede", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona sede" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Seleccionar</SelectItem>
+                      {sedeOptions.map((sede) => (
+                        <SelectItem key={sede} value={sede}>
+                          {sede}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
@@ -448,6 +474,38 @@ export default function ProductsPage() {
                     onChange={handleProductInputChange}
                     required
                   />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Precio unitario (S/)
+                  </label>
+                  <Input
+                    name="precio"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={formState.precio ?? 0}
+                    onChange={handleProductInputChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Tipo de venta
+                  </label>
+                  <Select
+                    value={formState.tipoMenu ?? "carta"}
+                    onValueChange={(value) =>
+                      handleFormInput("tipoMenu", value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="carta">Plato a la carta</SelectItem>
+                      <SelectItem value="menu">Plato de menú</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <label className="text-sm font-medium text-foreground">
@@ -521,6 +579,8 @@ function createEmptyProductForm(): CrearProductoPayload {
     tipo: BASE_CATEGORIES[0],
     sede: "",
     stock: 0,
+    precio: 0,
+    tipoMenu: "carta",
     imagenUrl: "",
     activo: true,
   };

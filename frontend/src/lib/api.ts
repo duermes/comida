@@ -193,7 +193,7 @@ export interface PlatoMenuItem {
   _id: string;
   nombre: string;
   descripcion?: string;
-  tipo: "entrada" | "segundo" | "postre" | "bebida";
+  tipo: "plato" | "bebida" | "postre" | "piqueo" | "entrada";
   imagenUrl?: string;
   sede?: string;
   stock: number;
@@ -377,6 +377,8 @@ export interface CrearProductoPayload {
   sede: string;
   stock: number;
   precio?: number;
+  // 'carta' = plato a la carta, 'menu' = plato de menú
+  tipoMenu?: "carta" | "menu";
   imagenUrl?: string;
   activo?: boolean;
 }
@@ -384,6 +386,18 @@ export interface CrearProductoPayload {
 export async function crearProducto(payload: CrearProductoPayload) {
   return request<PlatoMenuItem>("/api/platos-menu", {
     method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarProducto(
+  platoId: string,
+  payload: Partial<CrearProductoPayload>
+) {
+  if (!platoId)
+    throw new Error("El identificador del producto es obligatorio.");
+  return request<PlatoMenuItem>(`/api/platos-menu/${platoId}`, {
+    method: "PATCH",
     body: JSON.stringify(payload),
   });
 }
