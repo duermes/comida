@@ -208,6 +208,7 @@ export const getPerfil = async (req, reply) => {
       codigoUsu: user.codigoUsu,
       dni: user.dni,
       tipo: user.tipo,
+      mfaEnabled: Boolean(user.mfa_enabled && user.mfa_secret),
     });
   } catch (error) {
     reply.status(500).send({message: "Error obteniendo perfil", error});
