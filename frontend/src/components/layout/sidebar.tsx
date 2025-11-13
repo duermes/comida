@@ -57,7 +57,7 @@ export default function Sidebar({user}: SidebarProps) {
   return (
     <aside className="w-20 bg-primary-dark flex flex-col items-center py-6 space-y-8 border-r border-border">
       <Link
-        href="/home"
+        href="/home/menu"
         className="text-2xl font-bold text-white hover:opacity-80 transition-smooth"
       >
         <UtensilsCrossed size={28} />
