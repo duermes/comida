@@ -3,7 +3,7 @@
 import {useState} from "react";
 import {useRouter} from "next/navigation";
 import LoginForm from "@/components/auth/login-form";
-import {getProfile, login} from "@/lib/api";
+import {getProfile, isMfaChallenge, login} from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,11 +15,27 @@ export default function LoginPage() {
       const trimmedCodigo = codigo.trim().toLowerCase();
       const trimmedPassword = password.trim();
 
-      const a = await login(trimmedCodigo, trimmedPassword);
+      const result = await login(trimmedCodigo, trimmedPassword);
 
+      if (isMfaChallenge(result)) {
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem(
+            "mfaContext",
+            JSON.stringify({
+              mfaToken: result.mfaToken,
+              identificador: result.identificador,
+            })
+          );
+          window.localStorage.removeItem("user");
+        }
+        router.push("/mfa");
+        return;
+      }
 
       const profile = await getProfile();
-      localStorage.setItem("user", JSON.stringify(profile));
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("user", JSON.stringify(profile));
+      }
       router.push("/home/menu");
     } catch (error) {
       console.error("Error en login:", error);

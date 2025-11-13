@@ -97,6 +97,16 @@ export interface LoginResponse {
   token: string;
 }
 
+export interface LoginMfaChallenge {
+  id: string;
+  identificador: string;
+  rol: string;
+  mfaRequired: true;
+  mfaToken: string;
+}
+
+export type LoginResult = LoginResponse | LoginMfaChallenge;
+
 export interface UsuarioPerfil {
   id: string;
   nombre: string;
@@ -105,6 +115,7 @@ export interface UsuarioPerfil {
   dni?: string;
   tipo: string;
   sede?: string;
+  mfaEnabled?: boolean;
 }
 
 export interface PopulatedPlatoMenu {
@@ -216,12 +227,25 @@ export interface EncuestaMenuResultado {
   opciones: EncuestaOpcionResultado[];
 }
 
-export async function login(identificador: string, password: string) {
-  const result = await request<LoginResponse>("/api/auth/login", {
+export function isMfaChallenge(
+  result: LoginResult
+): result is LoginMfaChallenge {
+  return (result as LoginMfaChallenge).mfaRequired === true;
+}
+
+export async function login(
+  identificador: string,
+  password: string
+): Promise<LoginResult> {
+  const result = await request<LoginResult>("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({identificador, password}),
   });
-  setAuthToken(result.token);
+  if ("token" in result && result.token) {
+    setAuthToken(result.token);
+  } else {
+    setAuthToken(null);
+  }
   return result;
 }
 
@@ -372,4 +396,38 @@ export async function getResultadosEncuestas(params: {sede?: string} = {}) {
     ? `/api/menus/encuestas/resumen?${qs}`
     : "/api/menus/encuestas/resumen";
   return request<EncuestaMenuResultado[]>(path);
+}
+
+export interface MfaSetupResponse {
+  secret: string;
+  otpauthUrl: string;
+}
+
+export async function initiateMfaSetup() {
+  return request<MfaSetupResponse>("/api/auth/mfa/setup", {
+    method: "POST",
+  });
+}
+
+export async function verifyMfaSetup(code: string) {
+  return request<{message: string}>("/api/auth/mfa/verify", {
+    method: "POST",
+    body: JSON.stringify({code}),
+  });
+}
+
+export async function disableMfa(code: string) {
+  return request<{message: string}>("/api/auth/mfa/disable", {
+    method: "POST",
+    body: JSON.stringify({code}),
+  });
+}
+
+export async function completeMfaLogin(mfaToken: string, code: string) {
+  const result = await request<LoginResponse>("/api/auth/login/mfa", {
+    method: "POST",
+    body: JSON.stringify({mfaToken, code}),
+  });
+  setAuthToken(result.token);
+  return result;
 }
