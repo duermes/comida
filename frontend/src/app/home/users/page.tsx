@@ -127,8 +127,9 @@ export default function UsersPage() {
   }, [usuarios]);
 
   const typeOptions = useMemo(() => {
-    const roles = ["interno", "estudiante"];
-    return Array.from(roles).sort((a, b) => a.localeCompare(b));
+    // Backend expects 'interno' or 'externo'
+    const tipos = ["interno", "externo"];
+    return Array.from(tipos).sort((a, b) => a.localeCompare(b));
   }, [usuarios]);
   const handleFormInput = (field: keyof CrearUsuarioPayload, value: string) => {
     setFormState((prev) => ({...prev, [field]: value}));
