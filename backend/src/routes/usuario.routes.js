@@ -32,4 +32,14 @@ export default async function usuarioRoutes(fastify) {
     {preHandler: [verifyToken]},
     UsuarioController.toggleFavorito
   );
+  fastify.get(
+    "/mfa/setup",
+    {preHandler: [verifyToken]},
+    UsuarioController.mfaSetup
+  );
+  fastify.post(
+    "/mfa/confirm",
+    {preHandler: [verifyToken]},
+    UsuarioController.mfaConfirm
+  );
 }

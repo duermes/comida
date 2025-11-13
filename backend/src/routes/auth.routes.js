@@ -1,13 +1,25 @@
-import { register, login, logout, getPerfil } from "../controllers/auth.controller.js";
+import {
+  register,
+  login,
+  logout,
+  getPerfil,
+  loginMfa,
+  initiateMfaSetup,
+  verifyMfaSetup,
+  disableMfa,
+} from "../controllers/auth.controller.js";
 import verifyToken from "../middleware/verifyToken.js";
 
 export default async function authRoutes(fastify) {
-
-  fastify.post("/register", { preHandler: [verifyToken] } ,register);
+  fastify.post("/register", {preHandler: [verifyToken]}, register);
   fastify.post("/login", login);
-  fastify.post("/logout", { preHandler: [verifyToken] }, logout);
-  fastify.get("/verify", { preHandler: [verifyToken] }, async (req, reply) => {
-    reply.send({ valid: true, user: req.user });
+  fastify.post("/logout", {preHandler: [verifyToken]}, logout);
+  fastify.get("/verify", {preHandler: [verifyToken]}, async (req, reply) => {
+    reply.send({valid: true, user: req.user});
   });
-  fastify.get("/perfil", { preHandler: [verifyToken] }, getPerfil);
+  fastify.get("/perfil", {preHandler: [verifyToken]}, getPerfil);
+  fastify.post("/login/mfa", loginMfa);
+  fastify.post("/mfa/setup", {preHandler: [verifyToken]}, initiateMfaSetup);
+  fastify.post("/mfa/verify", {preHandler: [verifyToken]}, verifyMfaSetup);
+  fastify.post("/mfa/disable", {preHandler: [verifyToken]}, disableMfa);
 }

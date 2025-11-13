@@ -234,6 +234,14 @@ class UsuarioController {
       reply.code(500).send({error: "Error al actualizar favoritos"});
     }
   }
+
+  static async mfaSetup(req, reply) {
+    
+  }
+  static async mfaConfirm(req, reply) {
+
+  }
+
 }
 
 export default UsuarioController;
