@@ -72,6 +72,9 @@ export const register = async (req, reply) => {
       id: savedUser._id,
       identificador: savedUser.codigoUsu || savedUser.dni,
       rol: savedUser.rol,
+      nombre: savedUser.nombre,
+      codigoUsu: savedUser.codigoUsu,
+      dni: savedUser.dni,
     };
 
     if (token) {
