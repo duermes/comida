@@ -1,42 +1,51 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import type React from "react";
+import {useState} from "react";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
 
 interface LoginFormProps {
-  onSubmit: (codigo: string, password: string) => Promise<void>
-  isLoading: boolean
+  onSubmit: (codigo: string, password: string) => Promise<void>;
+  isLoading: boolean;
 }
 
-export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
-  const [codigo, setCodigo] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
+export default function LoginForm({onSubmit, isLoading}: LoginFormProps) {
+  const [codigo, setCodigo] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
+    e.preventDefault();
+    setError("");
+    console.log("Submitting login form with:", {codigo, password});
+    const trimmedCodigo = codigo.trim();
+    const trimmedPassword = password.trim();
 
-    if (!codigo || !password) {
-      setError("Por favor completa todos los campos")
-      return
+    if (!trimmedCodigo || !trimmedPassword) {
+      setError("Por favor completa todos los campos");
+      return;
     }
 
     try {
-      await onSubmit(codigo, password)
+      await onSubmit(trimmedCodigo, trimmedPassword);
     } catch (err) {
-      setError("Error al iniciar sesión. Intenta de nuevo.")
+      setError("Error al iniciar sesión. Intenta de nuevo.");
     }
-  }
+  };
+
+
 
   return (
     <div className="w-full max-w-6xl">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 items-stretch rounded-2xl overflow-hidden shadow-2xl bg-white">
         <div className="hidden lg:flex bg-[#EFF6FF] items-center justify-center p-12 min-h-[600px]">
           <div className="w-full h-full flex items-center justify-center">
-            <img src="/login-img.jpg" alt="UTP+FOOD Illustration" className="w-full h-full object-cover" />
+            <img
+              src="/login-img.jpg"
+              alt="UTP+FOOD Illustration"
+              className="w-full h-full object-cover"
+            />
           </div>
         </div>
 
@@ -44,7 +53,9 @@ export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
           <div className="mb-12">
             <div className="mb-6">
               <h1 className="text-4xl font-black text-[#000F37] tracking-tight">
-                <span className="inline-block bg-black text-white px-2 py-1 mr-2">UTP</span>
+                <span className="inline-block bg-black text-white px-2 py-1 mr-2">
+                  UTP
+                </span>
                 <span className="text-[#E60122]">+</span>FOOD
               </h1>
             </div>
@@ -52,15 +63,17 @@ export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
               Una nueva experiencia para reservar tu menu universitario.
             </p>
             <p className="text-base text-[#000F37]">
-              Ingresa tus datos para <span className="font-bold">Iniciar sesion.</span>
+              Ingresa tus datos para{" "}
+              <span className="font-bold">Iniciar sesion.</span>
             </p>
           </div>
 
-  
           <form onSubmit={handleSubmit} className="space-y-6">
-
             <div className="space-y-2">
-              <label htmlFor="codigo" className="block text-sm font-bold text-[#000F37]">
+              <label
+                htmlFor="codigo"
+                className="block text-sm font-bold text-[#000F37]"
+              >
                 Codigo UTP
               </label>
               <Input
@@ -75,7 +88,10 @@ export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="block text-sm font-bold text-[#000F37]">
+              <label
+                htmlFor="password"
+                className="block text-sm font-bold text-[#000F37]"
+              >
                 Contraseña
               </label>
               <Input
@@ -89,7 +105,6 @@ export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
               />
             </div>
 
-      
             {error && (
               <div className="p-4 bg-[#FFE5E5] border border-[#E60122] rounded-lg text-[#E60122] text-sm font-medium">
                 {error}
@@ -107,5 +122,5 @@ export default function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -127,7 +127,7 @@ export default function UsersPage() {
   }, [usuarios]);
 
   const typeOptions = useMemo(() => {
-    const roles = ["interno", "estudiante"]
+    const roles = ["interno", "estudiante"];
     return Array.from(roles).sort((a, b) => a.localeCompare(b));
   }, [usuarios]);
   const handleFormInput = (field: keyof CrearUsuarioPayload, value: string) => {
@@ -143,8 +143,14 @@ export default function UsersPage() {
     event.preventDefault();
     setFormError(null);
     setSuccessMessage(null);
+    
 
-    if (!formState.nombre || !formState.codigoUsu || !formState.password) {
+    const nombre = formState.nombre.trim();
+    const codigo = formState.codigoUsu.trim().toLowerCase();
+    const dni = formState.dni.trim().toLowerCase();
+    const password = formState.password.trim();
+
+    if (!nombre || !password) {
       setFormError("Completa los campos obligatorios marcados con *");
       return;
     }
@@ -154,14 +160,20 @@ export default function UsersPage() {
       return;
     }
 
-    if (!formState.dni) {
-      setFormError("Ingresa un identificador único para el usuario");
+    if (!codigo && !dni) {
+      setFormError("Ingresa al menos un identificador (código o DNI)");
       return;
     }
 
     setIsCreating(true);
     try {
-      const created = await crearUsuario(formState);
+      const created = await crearUsuario({
+        ...formState,
+        nombre,
+        codigoUsu: codigo,
+        dni,
+        password,
+      });
       setShowAddModal(false);
       setFormState(createEmptyUserForm());
       setSuccessMessage(`Usuario ${created.nombre} agregado correctamente.`);
@@ -334,7 +346,6 @@ export default function UsersPage() {
                     value={formState.codigoUsu}
                     onChange={handleInputChange}
                     placeholder="usuario@dominio.com"
-                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -386,7 +397,6 @@ export default function UsersPage() {
                     value={formState.dni}
                     onChange={handleInputChange}
                     placeholder="Código UTP o DNI"
-                    required
                   />
                 </div>
 
@@ -437,7 +447,7 @@ function createEmptyUserForm(): CrearUsuarioPayload {
   return {
     nombre: "",
     password: "",
-    tipo: '',
+    tipo: "",
     codigoUsu: "",
     dni: "",
     rol: "",

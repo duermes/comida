@@ -69,10 +69,16 @@ async function request<T>(
       // ignore JSON parsing errors
     }
 
-    const message =
-      (errorBody && typeof errorBody === "object" && "error" in errorBody
-        ? (errorBody as Record<string, unknown>).error
-        : response.statusText) || "Error en la petición";
+    let message: unknown = response.statusText;
+
+    if (errorBody && typeof errorBody === "object") {
+      const bodyRecord = errorBody as Record<string, unknown>;
+      message = bodyRecord.error ?? bodyRecord.message ?? message;
+    }
+
+    if (!message) {
+      message = "Error en la petición";
+    }
 
     throw new Error(String(message));
   }
@@ -315,9 +321,28 @@ export interface CrearUsuarioPayload {
 }
 
 export async function crearUsuario(payload: CrearUsuarioPayload) {
-  return request<UsuarioItem>("/api/usuarios", {
+  const codigo = payload.codigoUsu.trim().toLowerCase();
+  const dni = payload.dni.trim().toLowerCase();
+  const nombre = payload.nombre.trim();
+  const password = payload.password.trim();
+  const identificador = codigo || dni;
+
+  if (!identificador) {
+    throw new Error("Debes proporcionar un identificador para el usuario.");
+  }
+
+  const bodyPayload: CrearUsuarioPayload & {identificador: string} = {
+    ...payload,
+    nombre,
+    password,
+    codigoUsu: codigo,
+    dni,
+    identificador,
+  };
+
+  return request<UsuarioItem>("/api/auth/register", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(bodyPayload),
   });
 }
 

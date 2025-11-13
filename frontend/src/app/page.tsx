@@ -12,7 +12,12 @@ export default function LoginPage() {
   const handleLogin = async (codigo: string, password: string) => {
     setIsLoading(true);
     try {
-      await login(codigo, password);
+      const trimmedCodigo = codigo.trim().toLowerCase();
+      const trimmedPassword = password.trim();
+
+      const a = await login(trimmedCodigo, trimmedPassword);
+
+
       const profile = await getProfile();
       localStorage.setItem("user", JSON.stringify(profile));
       router.push("/home/menu");
