@@ -12,10 +12,12 @@ import {useRouter} from "next/navigation";
 import {
   crearProducto,
   getPlatosMenu,
+  crearMenu,
   actualizarProducto,
   type CrearProductoPayload,
   type PlatoMenuItem,
 } from "@/lib/api";
+import CreateMenuForm from "./create-menu-form";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {
@@ -56,6 +58,7 @@ export default function ProductsPage() {
   const [selectedSede, setSelectedSede] = useState("Todas");
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showCreateMenuModal, setShowCreateMenuModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formState, setFormState] = useState<CrearProductoPayload>(
@@ -278,6 +281,7 @@ export default function ProductsPage() {
             </Select>
 
             <Button onClick={openAddModal}>Añadir producto</Button>
+            <Button onClick={() => setShowCreateMenuModal(true)} className="bg-primary text-white hover:bg-primary/90">Crear menú</Button>
           </div>
         </div>
 
@@ -565,6 +569,33 @@ export default function ProductsPage() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showCreateMenuModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-foreground">Crear menú</h2>
+              <button
+                onClick={() => setShowCreateMenuModal(false)}
+                className="text-foreground-secondary hover:text-foreground transition-smooth text-2xl"
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <CreateMenuForm
+              platos={platos}
+              sedeOptions={sedeOptions}
+              onCancel={() => setShowCreateMenuModal(false)}
+              onCreated={async () => {
+                setShowCreateMenuModal(false);
+                await loadPlatos();
+              }}
+            />
           </div>
         </div>
       )}

@@ -17,7 +17,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es">
+    // suppressHydrationWarning: avoid noisy hydration warnings when the
+    // browser/extension mutates attributes on the <html> element before
+    // React hydrates (e.g. Dark Reader). Prefer disabling such extensions
+    // during development; this flag only silences the warning in React.
+    <html lang="es" suppressHydrationWarning>
       <body className={`${geistSans.className} ${geistMono.className}`}>{children}</body>
     </html>
   )

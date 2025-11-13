@@ -326,6 +326,27 @@ export async function getPlatosMenu(params: {sede?: string} = {}) {
   return request<PlatoMenuItem[]>(`/api/platos-menu${qs}`);
 }
 
+export interface CrearMenuPayload {
+  fecha: string; // ISO date
+  sede: string;
+  precioNormal: number;
+  precioEjecutivo: number;
+  normal: {entrada: string; segundo: string; bebida: string};
+  ejecutivo: {
+    entradas: string[];
+    segundos: string[];
+    postres: string[];
+    bebidas: string[];
+  };
+}
+
+export async function crearMenu(payload: CrearMenuPayload) {
+  return request<PopulatedMenu>("/api/menus", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function getUsuarios(params: {activo?: boolean} = {}) {
   const query = new URLSearchParams();
   if (typeof params.activo !== "undefined") {
