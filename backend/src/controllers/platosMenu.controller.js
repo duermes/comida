@@ -1,107 +1,117 @@
 import PlatoMenu from "../models/platosMenu.model.js";
+import Sede from "../models/Sede.model.js";
 import { ROLES } from "../lib/utils.js";
 
 class PlatoMenuController {
-  // Crear un nuevo plato (solo admin o coordinador de su sede)
+  // Crear un nuevo plato
   static async crearPlato(req, reply) {
     try {
       const usuario = req.user;
+      const { sede: sedeId, nombre, descripcion, tipo, imagenUrl, stock } = req.body;
+
       if (!usuario) return reply.code(401).send({ error: "No autenticado" });
-
-      if (![ROLES.ADMIN, ROLES.COORD].includes(usuario.rol)) {
+      if (![ROLES.ADMIN, ROLES.COORD].includes(usuario.rol))
         return reply.code(403).send({ error: "No tienes permisos para crear platos" });
-      }
 
-      // Si es coordinador, asignar automáticamente su sede
+      // Validar sede
+      let sedeDoc = null;
       if (usuario.rol === ROLES.COORD) {
-        req.body.sede = usuario.sede;
+        sedeDoc = await Sede.findById(usuario.sede);
+        if (!sedeDoc) return reply.code(400).send({ error: "Sede del coordinador no encontrada" });
+      } else if (sedeId) {
+        sedeDoc = await Sede.findById(sedeId);
+        if (!sedeDoc) return reply.code(400).send({ error: "Sede indicada no existe" });
+      } else {
+        return reply.code(400).send({ error: "Debe indicar una sede" });
       }
 
-      const nuevoPlato = await PlatoMenu.create(req.body);
-      reply.code(201).send(nuevoPlato);
+      const nuevoPlato = await PlatoMenu.create({
+        nombre,
+        descripcion,
+        tipo,
+        imagenUrl,
+        stock,
+        sede: sedeDoc._id,
+      });
+
+      return reply.code(201).send(nuevoPlato);
 
     } catch (error) {
       console.error("Error al crear plato de menú:", error);
-      reply.code(500).send({ error: "Error en el servidor" });
+      reply.code(500).send({ error: "Error al crear plato", detalle: error.message });
     }
   }
 
-  // Listar platos (admin ve todo, coordinador solo su sede, usuario error)
+  // Listar platos
   static async listarPlatos(req, reply) {
     try {
       const usuario = req.user;
+      const { sede: querySede } = req.query || {};
+
       if (!usuario) return reply.code(401).send({ error: "No autenticado" });
 
-      // Permitir a administradores ver todos los platos
+      let filtros = { activo: true };
+
       if (usuario.rol === ROLES.ADMIN) {
-        const platos = await PlatoMenu.find();
-        return reply.send(platos);
+        if (querySede) filtros.sede = querySede;
+      } else if (usuario.rol === ROLES.COORD) {
+        filtros.sede = usuario.sede;
+      } else {
+        if (!querySede) return reply.code(403).send({ error: "Debes indicar una sede" });
+        filtros.sede = querySede;
       }
 
-      // Obtener sede opcional desde query (frontend puede pasar ?sede=xxx)
-      const { sede } = req.query || {};
-
-      // Coordinadores ven platos de su sede
-      if (usuario.rol === ROLES.COORD) {
-        const platos = await PlatoMenu.find({ sede: usuario.sede });
-        return reply.send(platos);
-      }
-
-      // Usuarios autenticados pueden listar platos si se solicita una sede
-      if (sede) {
-        const platos = await PlatoMenu.find({ sede });
-        return reply.send(platos);
-      }
-
-      return reply.code(403).send({ error: "Debes especificar una sede para listar platos" });
+      const platos = await PlatoMenu.find(filtros).populate("sede");
+      return reply.send(platos);
 
     } catch (error) {
-      reply.code(500).send({ error: "Error al listar platos" });
+      reply.code(500).send({ error: "Error al listar platos", detalle: error.message });
     }
   }
 
-  // Actualizar plato (solo admin o coordinador de su sede)
+  // Actualizar plato
   static async actualizarPlato(req, reply) {
     try {
       const usuario = req.user;
       const { platoId } = req.params;
 
-      if (![ROLES.ADMIN, ROLES.COORD].includes(usuario.rol)) {
+      if (![ROLES.ADMIN, ROLES.COORD].includes(usuario.rol))
         return reply.code(403).send({ error: "No autorizado" });
-      }
 
       const plato = await PlatoMenu.findById(platoId);
       if (!plato) return reply.code(404).send({ error: "Plato no encontrado" });
 
-      if (usuario.rol === ROLES.COORD && plato.sede !== usuario.sede) {
+      if (usuario.rol === ROLES.COORD && plato.sede.toString() !== usuario.sede)
         return reply.code(403).send({ error: "No puedes modificar platos de otra sede" });
-      }
 
       Object.assign(plato, req.body);
       await plato.save();
 
-      reply.send(plato);
+      return reply.send(plato);
 
     } catch (error) {
-      reply.code(500).send({ error: "Error al actualizar plato" });
+      reply.code(500).send({ error: "Error al actualizar plato", detalle: error.message });
     }
   }
 
-  // Eliminar plato (solo admin)
+  // Eliminar plato
   static async eliminarPlato(req, reply) {
     try {
       const usuario = req.user;
       const { platoId } = req.params;
 
-      if (usuario.rol !== ROLES.ADMIN) {
-        return reply.code(403).send({ error: "Solo un admin puede eliminar platos" });
+      const plato = await PlatoMenu.findById(platoId);
+      if (!plato) return reply.code(404).send({ error: "Plato no encontrado" });
+
+      if (usuario.rol === ROLES.ADMIN || (usuario.rol === ROLES.COORD && plato.sede.toString() === usuario.sede)) {
+        await PlatoMenu.findByIdAndDelete(platoId);
+        return reply.send({ message: "Plato eliminado" });
       }
 
-      await PlatoMenu.findByIdAndDelete(platoId);
-      reply.send({ message: "Plato eliminado" });
+      return reply.code(403).send({ error: "No tienes permisos para eliminar este plato" });
 
     } catch (error) {
-      reply.code(500).send({ error: "Error al eliminar plato" });
+      reply.code(500).send({ error: "Error al eliminar plato", detalle: error.message });
     }
   }
 }
