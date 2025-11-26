@@ -6,9 +6,7 @@ import bcrypt from "bcrypt";
 import speakeasy from "speakeasy";
 import { createAccessToken, createMfaToken } from "../lib/jwt.js";
 
-// ================================
 //   REGISTER COMPLETO Y FINAL
-// ================================
 export const register = async (req, reply) => {
   const {
     numero: dni,
@@ -17,14 +15,12 @@ export const register = async (req, reply) => {
     password,
     tipo,
     codigoUsu,
-    rol,   // <- este es el rol solicitado
+    rol, 
     sede
   } = req.body;
 
   try {
-    // =========================================
-    // 1. Validar duplicados (dni o codigoUsu)
-    // =========================================
+// 1. Validar duplicados (dni o codigoUsu)
     const existingUser = await Usuario.findOne({
       $or: [
         codigoUsu ? { codigoUsu } : null,
@@ -38,19 +34,15 @@ export const register = async (req, reply) => {
         message: "El usuario ya existe (DNI o código duplicado)",
       });
     }
-
-    // =========================================
-    // 2. Crear DNI
-    // =========================================
+// 2. Crear DNI
     const dniDoc = await Dni.create({
       numero: dni,
       nombres,
       apellidos
     });
 
-    // =========================================
-    // 3. Resolver rol a asignar según permisos
-    // =========================================
+// 3. Resolver rol a asignar según permisos
+
     let roleToAssign = null;
 
     // Caso 1: Si no hay token → solo puede crear usuarios con rol "usuario"
@@ -90,10 +82,8 @@ export const register = async (req, reply) => {
         roleToAssign = requestedRole;
       }
     }
+// 4. Validaciones propias del tipo
 
-    // =========================================
-    // 4. Validaciones propias del tipo
-    // =========================================
     if (tipo === "interno") {
       if (!codigoUsu)
         return reply.status(400).send({
@@ -107,14 +97,10 @@ export const register = async (req, reply) => {
       }
     }
 
-    // =========================================
     // 5. Hash password
-    // =========================================
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // =========================================
     // 6. Crear usuario
-    // =========================================
     const newUser = await Usuario.create({
       dni: dniDoc._id,
       password: hashedPassword,
@@ -124,9 +110,7 @@ export const register = async (req, reply) => {
       sede: sede ?? null
     });
 
-    // =========================================
     // 7. Token si no estaba logueado
-    // =========================================
     let token = null;
     if (!req.user) {
       token = await createAccessToken({
@@ -135,9 +119,7 @@ export const register = async (req, reply) => {
       });
     }
 
-    // =========================================
     // 8. Respuesta
-    // =========================================
     reply.send({
       id: newUser._id,
       dni: dniDoc.numero,
@@ -156,9 +138,9 @@ export const register = async (req, reply) => {
   }
 };
 
-// ================================
+
 //  LOGIN
-// ================================
+
 export const login = async (req, reply) => {
   const { identificador, password } = req.body;
 
@@ -225,18 +207,15 @@ export const login = async (req, reply) => {
 };
 
 
-// ================================
 //  LOGOUT
-// ================================
+
 export const logout = async (req, reply) => {
   reply.clearCookie("token");
   reply.send({ message: "Sesión cerrada" });
 };
 
-
-// ================================
 //  PERFIL
-// ================================
+
 export const getPerfil = async (req, reply) => {
   try {
     const user = await Usuario.findById(req.user.id)
@@ -263,9 +242,7 @@ export const getPerfil = async (req, reply) => {
 };
 
 
-// ================================
 //  MFA
-// ================================
 export const initiateMfaSetup = async (req, reply) => {
   try {
     const user = await Usuario.findById(req.user.id);
