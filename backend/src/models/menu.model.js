@@ -5,7 +5,7 @@ const MenuSchema = new mongoose.Schema({
   fecha: { type: Date, required: true },
 
 // Sede a la que pertenece el menú
-  sede: { type: String, required: true },
+  sede: {type: mongoose.Schema.Types.ObjectId, ref: "Sede", required: true },
 
 // Precios del menú
   precioNormal: { type: Number, required: true },

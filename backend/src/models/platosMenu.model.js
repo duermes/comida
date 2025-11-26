@@ -9,7 +9,7 @@ const PlatoMenuSchema = new mongoose.Schema({
     required: true 
   },
   imagenUrl: { type: String },
-  sede: { type: String, default: "general" },
+  sede: {type: mongoose.Schema.Types.ObjectId, ref: "Sede", required: true },
   stock: { type: Number, default: 0, min: 0 },
   activo: { type: Boolean, default: true }
 });

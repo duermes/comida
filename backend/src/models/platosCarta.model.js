@@ -21,7 +21,7 @@ const PlatoCartaSchema = new mongoose.Schema({
   activo: { type: Boolean, default: true },
 
 // En qué sede está disponible
-  sede: { type: String, default: "general" }
+  sede: {type: mongoose.Schema.Types.ObjectId, ref: "Sede", required: true },
 });
 
 export default mongoose.model('PlatoCarta', PlatoCartaSchema);
