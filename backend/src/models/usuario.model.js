@@ -2,8 +2,13 @@ import mongoose from "mongoose";
 
 const UsuarioSchema = new mongoose.Schema(
   {
-    // Nombre y contraseña de usuario
-    nombre: {type: String, required: true},
+    // DNI del usuario (requerido para usuarios externos e internos)
+    dni: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Dni",
+      required: true,
+    },
+
     password: {type: String, required: true},
 
     // Tipo de usuario: 'interno' o 'externo'
@@ -17,23 +22,15 @@ const UsuarioSchema = new mongoose.Schema(
       },
     },
 
-    // DNI del usuario (requerido para usuarios externos e internos)
-    dni: {
-      type: String,
-      required: function () {
-        return this.tipo === "externo" || this.tipo === "interno";
-      },
-    },
-
     // Rol del usuario
     rol: {
-      type: String,
-      enum: ["usuario", "admin", "profesor", "coordinador"],
-      default: "usuario",
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Rol",
+      required: true,
     }, // agregado profesor
 
     // Sede a la que pertenece el usuario (solo para usuarios internos)
-    sede: {type: String},
+    sede: {type: mongoose.Schema.Types.ObjectId, ref: "Sede" },
 
     // Lista de platos favoritos del usuario
     favoritos: [

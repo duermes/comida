@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const notasSchema = new mongoose.Schema({
 // Usuario que crea la nota
   usuarioId: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', required: true },
-  sede : { type: String, required: true },
+  sede: {type: mongoose.Schema.Types.ObjectId, ref: "Sede", required: true },
 
 // Puede ser ID de PlatoMenu, Menú, o cualquier otro producto
   productoId: { type: mongoose.Schema.Types.ObjectId, required: true },

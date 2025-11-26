@@ -12,7 +12,7 @@ import mongoose from "mongoose";
     const PedidoSchema = new mongoose.Schema({
     usuarioId: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', required: true },
 
-    sede: { type: String, required: true }, // Para saber dónde se recoge o entrega
+    sede: {type: mongoose.Schema.Types.ObjectId, ref: "Sede", required: true },
 
 // Plato o menú pedidos
     items: { type: [ItemPedidoSchema], required: true },
@@ -20,17 +20,9 @@ import mongoose from "mongoose";
 // Cálculo automático del total basado en los items
     total: { type: Number, required: true },
 
-    estado: { 
-        type: String, 
-        enum: ['pendiente', 'pagado', 'preparando', 'listo', 'entregado', 'cancelado'], 
-        default: 'pendiente' 
-    },
+    estado: { type: mongoose.Schema.Types.ObjectId, ref: "EstadoPedido", required: true },
 
-    metodoPago: { 
-        type: String, 
-        enum: ['efectivo', 'tarjeta', 'yape', 'plin', 'otro', 'no_definido'], 
-        default: 'no_definido'
-    },
+    metodoPago: { type: mongoose.Schema.Types.ObjectId, ref: "MetodoPago", required: true },
 
     creadoEn: { type: Date, default: Date.now }
     });
