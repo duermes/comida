@@ -20,7 +20,13 @@ export default function FavoritesPage() {
       setLoading(true);
       try {
         const response = await getFavoritos();
-        setFavorites(response);
+        // Evitar duplicados por refId/tipo
+        const unique = new Map<string, FavoritoResponse>();
+        response.forEach((fav) => {
+          const key = `${fav.tipo}:${String(fav.refId ?? "").trim()}`;
+          if (!unique.has(key)) unique.set(key, fav);
+        });
+        setFavorites(Array.from(unique.values()));
       } catch (error) {
         console.error("Error al obtener favoritos:", error);
       } finally {
@@ -40,45 +46,29 @@ export default function FavoritesPage() {
   );
 
   const items = useMemo<DisplayMenuItem[]>(() => {
-    return menuFavorites.flatMap((fav) => {
+    return menuFavorites.map((fav) => {
       const menu = fav.menu as PopulatedMenu;
       const formattedDate = new Date(menu.fecha).toLocaleDateString();
+      const sedeLabel = menu.sedeNombre ?? menu.sede;
 
-      return [
-        {
-          id: `${menu._id}-normal-favorite`,
-          menuId: menu._id,
-          variant: "normal" as const,
-          title: `Menú universitario - ${formattedDate}`,
-          description: [
-            menu.normal.entrada?.nombre,
-            menu.normal.segundo?.nombre,
-            menu.normal.bebida?.nombre,
-          ]
-            .filter(Boolean)
-            .join(" • "),
-          price: menu.precioNormal,
-          image:
-            menu.normal.segundo?.imagenUrl ?? menu.normal.entrada?.imagenUrl,
-          sede: menu.sede,
-          isFavorite: true,
-          menu,
-        },
-        {
-          id: `${menu._id}-ejecutivo-favorite`,
-          menuId: menu._id,
-          variant: "ejecutivo" as const,
-          title: `Menú ejecutivo - ${formattedDate}`,
-          description: `${menu.ejecutivo.segundos.length} opciones de fondo`,
-          price: menu.precioEjecutivo,
-          image:
-            menu.ejecutivo.segundos?.[0]?.imagenUrl ??
-            menu.normal.segundo?.imagenUrl,
-          sede: menu.sede,
-          isFavorite: true,
-          menu,
-        },
-      ];
+      return {
+        id: `${menu._id}-favorite`,
+        menuId: menu._id,
+        variant: "normal" as const,
+        title: `Menú del día - ${formattedDate}`,
+        description: [
+          menu.normal.entrada?.nombre,
+          menu.normal.segundo?.nombre,
+          menu.normal.bebida?.nombre,
+        ]
+          .filter(Boolean)
+          .join(" • "),
+        price: menu.precioNormal,
+        image: menu.normal.segundo?.imagenUrl ?? menu.normal.entrada?.imagenUrl,
+        sede: sedeLabel,
+        isFavorite: true,
+        menu,
+      };
     });
   }, [menuFavorites]);
 

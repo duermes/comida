@@ -14,8 +14,10 @@ import {
   getPlatosMenu,
   crearMenu,
   actualizarProducto,
+  getSedes,
   type CrearProductoPayload,
   type PlatoMenuItem,
+  type SedeItem,
 } from "@/lib/api";
 import CreateMenuForm from "./create-menu-form";
 import {Button} from "@/components/ui/button";
@@ -64,6 +66,7 @@ export default function ProductsPage() {
   const [formState, setFormState] = useState<CrearProductoPayload>(
     createEmptyProductForm()
   );
+  const [sedes, setSedes] = useState<SedeItem[]>([]);
 
   useEffect(() => {
     const stored =
@@ -107,13 +110,27 @@ export default function ProductsPage() {
     }
   }, [authorized]);
 
+  const loadSedes = useCallback(async () => {
+    if (!authorized) return;
+    try {
+      const response = await getSedes();
+      setSedes(response);
+    } catch (err) {
+      console.error("Error al cargar sedes:", err);
+    }
+  }, [authorized]);
+
   useEffect(() => {
     if (!authorized) return;
     loadPlatos();
-  }, [authorized, loadPlatos]);
+    loadSedes();
+  }, [authorized, loadPlatos, loadSedes]);
 
-  // For product creation we only allow two fixed sedes
-  const sedeOptions = useMemo(() => ["Lima Centro", "Arequipa"], []);
+  // Sedes disponibles para selección
+  const sedeOptions = useMemo(
+    () => sedes.map((s) => s.nombre),
+    [sedes]
+  );
 
   const categoryOptions = useMemo(() => {
     const categorias = new Set<string>(BASE_CATEGORIES);

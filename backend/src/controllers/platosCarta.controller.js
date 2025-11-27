@@ -1,5 +1,5 @@
 import PlatoCarta from "../models/platosCarta.model.js";
-import Sede from "../models/Sede.model.js";
+import Sede from "../models/sede.model.js";
 import { ROLES } from "../lib/utils.js";
 
 class PlatoCartaController {

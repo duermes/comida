@@ -3,7 +3,8 @@ import verifyToken from "../middleware/verifyToken.js";
 
 export default async function menuRoutes(fastify) {
   fastify.post("/", {preHandler: [verifyToken]}, MenuController.crearMenu);
-  fastify.get("/", {preHandler: [verifyToken]}, MenuController.listarMenus);
+  // Listado público; el controlador ajusta filtros según rol si hay token
+  fastify.get("/", MenuController.listarMenus);
   fastify.put(
     "/:id",
     {preHandler: [verifyToken]},

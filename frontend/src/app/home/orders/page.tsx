@@ -49,7 +49,20 @@ export default function OrdersPage() {
     const transform = (pedido: PedidoResponse): UIOrder => {
       const primerItem = pedido.items[0];
       const fecha = new Date(pedido.creadoEn);
-      const status = STATUS_MAP[pedido.estado] ?? pedido.estado;
+
+      const estadoRaw =
+        typeof pedido.estado === "string"
+          ? pedido.estado
+          : pedido.estado?.nombre ?? "pendiente";
+      const status = STATUS_MAP[estadoRaw.toLowerCase?.() ?? estadoRaw] ?? estadoRaw;
+
+      const isObjectId = (value: string) =>
+        /^[a-f\d]{24}$/i.test(value.trim());
+
+      const sedeLabel =
+        typeof pedido.sede === "string"
+          ? isObjectId(pedido.sede) ? "Sede no disponible" : pedido.sede
+          : pedido.sede?.nombre ?? "Sin sede";
 
       return {
         id: `#${pedido._id.slice(-6)}`,
@@ -57,7 +70,7 @@ export default function OrdersPage() {
         dish: primerItem?.nombre ?? "Menú reservado",
         category: primerItem?.tipo === "menu" ? "Menú" : "Carta",
         menu: `Reserva ${pedido.items.length > 1 ? "múltiple" : "individual"}`,
-        sede: pedido.sede,
+        sede: sedeLabel,
         date: fecha.toLocaleDateString(),
         time: fecha.toLocaleTimeString([], {
           hour: "2-digit",

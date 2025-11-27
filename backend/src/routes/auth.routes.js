@@ -6,6 +6,7 @@ import {
   initiateMfaSetup,
   verifyMfaSetup,
   disableMfa,
+  loginMfa,
 } from "../controllers/auth.controller.js";
 import verifyToken from "../middleware/verifyToken.js";
 
@@ -20,4 +21,5 @@ export default async function authRoutes(fastify) {
   fastify.post("/mfa/setup", {preHandler: [verifyToken]}, initiateMfaSetup);
   fastify.post("/mfa/verify", {preHandler: [verifyToken]}, verifyMfaSetup);
   fastify.post("/mfa/disable", {preHandler: [verifyToken]}, disableMfa);
+  fastify.post("/login/mfa", loginMfa);
 }

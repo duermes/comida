@@ -1,10 +1,14 @@
 import Usuario from "../models/usuario.model.js";
 import Rol from "../models/rol.model.js";
 import Dni from "../models/dni.model.js";
-import Sede from "../models/Sede.model.js";
+import Sede from "../models/sede.model.js";
 import bcrypt from "bcrypt";
 import speakeasy from "speakeasy";
-import { createAccessToken, createMfaToken } from "../lib/jwt.js";
+import { createAccessToken, createMfaToken, verifyJwt } from "../lib/jwt.js";
+
+function escapeRegex(str = "") {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 //   REGISTER COMPLETO Y FINAL
 export const register = async (req, reply) => {
@@ -15,19 +19,21 @@ export const register = async (req, reply) => {
     password,
     tipo,
     codigoUsu,
-    rol, 
+    rol,
     sede
   } = req.body;
 
+  const codigoUsuNormalizado = codigoUsu?.trim().toLowerCase();
+  const dniNormalizado = dni?.trim().toLowerCase();
+
   try {
 // 1. Validar duplicados (dni o codigoUsu)
-    const existingUser = await Usuario.findOne({
-      $or: [
-        codigoUsu ? { codigoUsu } : null,
-      ].filter(Boolean)
-    });
+    const duplicateFilters = [codigoUsuNormalizado ? { codigoUsu: codigoUsuNormalizado } : null].filter(Boolean);
+    const existingUser = duplicateFilters.length
+      ? await Usuario.findOne({ $or: duplicateFilters })
+      : null;
 
-    const existingDni = await Dni.findOne({ numero: dni });
+    const existingDni = await Dni.findOne({ numero: dniNormalizado });
 
     if (existingUser || existingDni) {
       return reply.status(400).send({
@@ -36,7 +42,7 @@ export const register = async (req, reply) => {
     }
 // 2. Crear DNI
     const dniDoc = await Dni.create({
-      numero: dni,
+      numero: dniNormalizado,
       nombres,
       apellidos
     });
@@ -105,7 +111,7 @@ export const register = async (req, reply) => {
       dni: dniDoc._id,
       password: hashedPassword,
       tipo,
-      codigoUsu: tipo === "interno" ? codigoUsu : undefined,
+      codigoUsu: tipo === "interno" ? codigoUsuNormalizado : undefined,
       rol: roleToAssign._id,
       sede: sede ?? null
     });
@@ -143,17 +149,34 @@ export const register = async (req, reply) => {
 
 export const login = async (req, reply) => {
   const { identificador, password } = req.body;
+  const normalizedId = (identificador ?? "").trim().toLowerCase();
 
   try {
+    if (!normalizedId || !password?.trim()) {
+      return reply.status(400).send({ message: "Identificador y contraseña son obligatorios" });
+    }
+
     let userFound = null;
 
-    // Código interno
-    userFound = await Usuario.findOne({ codigoUsu: identificador })
+    // Código interno (normalizado y case-insensitive)
+    const escaped = escapeRegex(normalizedId);
+    userFound = await Usuario.findOne({ codigoUsu: normalizedId })
       .populate("dni")
       .populate("rol");
     // Intentar por DNI si no es interno
     if (!userFound) {
-      const dniDoc = await Dni.findOne({ numero: identificador });
+      userFound = await Usuario.findOne({ codigoUsu: { $regex: `^${escaped}$`, $options: "i" } })
+        .populate("dni")
+        .populate("rol");
+    }
+
+    if (!userFound) {
+      const dniDoc = await Dni.findOne({
+        $or: [
+          { numero: normalizedId },
+          { numero: { $regex: `^${escaped}$`, $options: "i" } }
+        ]
+      });
       if (dniDoc) {
         userFound = await Usuario.findOne({ dni: dniDoc._id })
           .populate("dni")
@@ -221,19 +244,26 @@ export const getPerfil = async (req, reply) => {
     const user = await Usuario.findById(req.user.id)
       .select("-password")
       .populate("dni")
-      .populate("rol");
+      .populate("rol")
+      .populate("sede");
 
     if (!user)
       return reply.status(404).send({ message: "Usuario no encontrado" });
 
+    const nombreCompleto = [user?.dni?.nombres, user?.dni?.apellidos]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
     reply.send({
       id: user._id,
-      nombre: user.nombre,
+      nombre: nombreCompleto || user?.dni?.nombres || user?.codigoUsu || user?.dni?.numero,
       rol: user.rol?.nombre,
       codigoUsu: user.codigoUsu,
       dni: user.dni?.numero,
       tipo: user.tipo,
-      sede: user.sede,
+      sede: user.sede?._id ?? user.sede ?? null,
+      sedeNombre: user.sede?.nombre ?? null,
       mfaEnabled: Boolean(user.mfa_enabled && user.mfa_secret),
     });
   } catch (error) {
@@ -333,5 +363,51 @@ export const disableMfa = async (req, reply) => {
     reply.send({ message: "Autenticación de dos factores desactivada" });
   } catch (error) {
     reply.status(500).send({ message: "Error deshabilitando 2FA", error });
+  }
+};
+
+// Completar login con MFA
+export const loginMfa = async (req, reply) => {
+  const { mfaToken, code } = req.body;
+  if (!mfaToken || !code) {
+    return reply.status(400).send({ message: "Token MFA y código son requeridos" });
+  }
+
+  try {
+    const decoded = await verifyJwt(mfaToken);
+    if (!decoded?.mfa || !decoded?.id) {
+      return reply.status(400).send({ message: "Token MFA inválido" });
+    }
+
+    const user = await Usuario.findById(decoded.id).populate("rol");
+    if (!user || !user.mfa_enabled || !user.mfa_secret) {
+      return reply.status(400).send({ message: "No hay MFA habilitado para este usuario" });
+    }
+
+    const isValid = speakeasy.totp.verify({
+      secret: user.mfa_secret,
+      encoding: "base32",
+      token: String(code).trim(),
+      window: 1,
+    });
+
+    if (!isValid) {
+      return reply.status(400).send({ message: "Código MFA inválido" });
+    }
+
+    const token = await createAccessToken({
+      id: user._id,
+      rol: user.rol?.nombre,
+    });
+
+    reply.send({
+      id: user._id,
+      identificador: user.codigoUsu ?? user.dni?.numero,
+      rol: user.rol?.nombre,
+      token,
+    });
+  } catch (error) {
+    console.error("Error en login MFA:", error);
+    reply.status(500).send({ message: "Error al validar MFA", error });
   }
 };

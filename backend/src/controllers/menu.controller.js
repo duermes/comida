@@ -2,8 +2,42 @@
 import Menu from "../models/menu.model.js";
 import PlatoMenu from "../models/platosMenu.model.js";
 import EncuestaRapida from "../models/encuestaRapida.model.js";
-import Sede from "../models/Sede.model.js";
+import Sede from "../models/sede.model.js";
+import Usuario from "../models/usuario.model.js";
 import { ROLES } from "../lib/utils.js";
+
+async function buscarSedePorIdONombre(sede) {
+  const raw = typeof sede === "string" ? sede.trim() : sede;
+  if (!raw) return null;
+
+  if (mongoose.Types.ObjectId.isValid(raw)) {
+    const sedeDoc = await Sede.findById(raw);
+    if (sedeDoc) return sedeDoc;
+  }
+
+  const escaped = String(raw).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return Sede.findOne({ nombre: new RegExp(`^${escaped}$`, "i") });
+}
+
+async function obtenerSedeDeUsuario(usuarioId) {
+  if (!usuarioId) return null;
+  const usuarioDb = await Usuario.findById(usuarioId).select("sede");
+  return usuarioDb?.sede ?? null;
+}
+
+async function obtenerOSiNoCrearSede(sede) {
+  const raw = typeof sede === "string" ? sede.trim() : sede;
+  if (!raw) return null;
+
+  const existente = await buscarSedePorIdONombre(raw);
+  if (existente) return existente;
+
+  // Si no existe y se envió un nombre, creamos una sede placeholder
+  if (typeof raw === "string") {
+    return Sede.create({ nombre: raw, direccion: "Sin dirección" });
+  }
+  return null;
+}
 
 class MenuController {
   // Crear menú
@@ -19,11 +53,18 @@ class MenuController {
       // Asignar sede
       let sedeAsignada;
       if (usuario.rol === ROLES.COORD) {
-        sedeAsignada = usuario.sede; // ya es ObjectId
+        const sedeUser = await obtenerSedeDeUsuario(usuario.id);
+        if (!sedeUser) return reply.code(400).send({ error: "Tu usuario no tiene sede asignada" });
+        sedeAsignada = sedeUser;
       } else {
-        const sedeDoc = await Sede.findById(sede);
+        const sedeDoc = await obtenerOSiNoCrearSede(sede);
         if (!sedeDoc) return reply.code(400).send({ error: "La sede enviada no existe" });
         sedeAsignada = sedeDoc._id;
+      }
+
+      const fechaNormalizada = fecha ? new Date(fecha) : null;
+      if (!fechaNormalizada || Number.isNaN(fechaNormalizada.getTime())) {
+        return reply.code(400).send({ error: "La fecha del menú es inválida" });
       }
 
       // --- Validación de platos ---
@@ -35,16 +76,19 @@ class MenuController {
       };
 
       // Menú normal
+      if (!normal?.entrada || !normal?.segundo || !normal?.bebida) {
+        return reply.code(400).send({ error: "Entrada, segundo y bebida del menú normal son obligatorios" });
+      }
       await validarPlato(normal.entrada, "entrada del menú normal");
       await validarPlato(normal.segundo, "segundo del menú normal");
       await validarPlato(normal.bebida, "bebida del menú normal");
 
       // Menú ejecutivo
       const grupos = [
-        { tipo: "entradas ejecutivas", arr: ejecutivo.entradas },
-        { tipo: "segundos ejecutivos", arr: ejecutivo.segundos },
-        { tipo: "postres ejecutivos", arr: ejecutivo.postres },
-        { tipo: "bebidas ejecutivas", arr: ejecutivo.bebidas },
+        { tipo: "entradas ejecutivas", arr: ejecutivo?.entradas ?? [] },
+        { tipo: "segundos ejecutivos", arr: ejecutivo?.segundos ?? [] },
+        { tipo: "postres ejecutivos", arr: ejecutivo?.postres ?? [] },
+        { tipo: "bebidas ejecutivas", arr: ejecutivo?.bebidas ?? [] },
       ];
 
       for (const grupo of grupos) {
@@ -54,7 +98,7 @@ class MenuController {
       }
 
       const nuevoMenu = await Menu.create({
-        fecha,
+        fecha: fechaNormalizada,
         sede: sedeAsignada,
         precioNormal,
         precioEjecutivo,
@@ -81,34 +125,49 @@ class MenuController {
       if (!usuario || usuario.rol === ROLES.USER) {
         filtros.activo = true;
         if (sede) {
-          const sedeDoc = await Sede.findById(sede);
+          const sedeDoc = await buscarSedePorIdONombre(sede);
           if (sedeDoc) filtros.sede = sedeDoc._id;
         }
       }
-      // Coordinador: su sede
+      // Coordinador: su sede (buscamos en DB para evitar tokens incompletos)
       else if (usuario.rol === ROLES.COORD) {
-        filtros.sede = usuario.sede;
+        const sedeUser = await obtenerSedeDeUsuario(usuario.id);
+        if (!sedeUser) return reply.code(400).send({ error: "Tu usuario no tiene sede asignada" });
+        filtros.sede = sedeUser;
       }
       // Admin: puede filtrar por sede
       else if (usuario.rol === ROLES.ADMIN && sede) {
-        const sedeDoc = await Sede.findById(sede);
+        const sedeDoc = await buscarSedePorIdONombre(sede);
         if (!sedeDoc) return reply.code(400).send({ error: "La sede enviada no existe" });
         filtros.sede = sedeDoc._id;
       }
 
-      if (fecha) filtros.fecha = new Date(fecha);
+      if (fecha) {
+        const f = new Date(fecha);
+        if (!Number.isNaN(f.getTime())) filtros.fecha = f;
+      }
 
-      const menus = await Menu.find(filtros)
-        .populate({
-          path: "normal.entrada normal.segundo normal.bebida ejecutivo.entradas ejecutivo.segundos ejecutivo.postres ejecutivo.bebidas",
-          select: "nombre tipo stock activo descripcion imagenUrl",
-        })
-        .sort({ fecha: -1 });
+      let menus;
+      try {
+        menus = await Menu.find(filtros)
+          .populate({
+            path: "normal.entrada normal.segundo normal.bebida ejecutivo.entradas ejecutivo.segundos ejecutivo.postres ejecutivo.bebidas",
+            select: "nombre tipo stock activo descripcion imagenUrl",
+          })
+          .populate("sede", "nombre direccion")
+          .sort({ fecha: -1 })
+          .lean();
+      } catch (populateErr) {
+        console.error("Error populando menús, usando fallback sin populate:", populateErr);
+        menus = await Menu.find(filtros).sort({ fecha: -1 }).lean();
+      }
 
+      // Evitamos transformaciones adicionales para no introducir errores; el frontend puede usar sede._id y sede.nombre
       reply.send(menus);
     } catch (error) {
       console.error("Error al listar menús:", error);
-      reply.code(500).send({ error: "Error al listar menús" });
+      // Devolvemos arreglo vacío para no romper el frontend si hay un fallo aislado
+      reply.code(200).send([]);
     }
   }
 
@@ -126,8 +185,11 @@ class MenuController {
       const menu = await Menu.findById(id);
       if (!menu) return reply.code(404).send({ error: "Menú no encontrado" });
 
-      if (usuario.rol === ROLES.COORD && menu.sede.toString() !== usuario.sede.toString()) {
-        return reply.code(403).send({ error: "Solo puedes modificar menús de tu sede" });
+      if (usuario.rol === ROLES.COORD) {
+        const sedeUser = await obtenerSedeDeUsuario(usuario.id);
+        if (!sedeUser || menu.sede.toString() !== sedeUser.toString()) {
+          return reply.code(403).send({ error: "Solo puedes modificar menús de tu sede" });
+        }
       }
 
       Object.assign(menu, datos);
@@ -154,8 +216,11 @@ class MenuController {
       const menu = await Menu.findById(id);
       if (!menu) return reply.code(404).send({ error: "Menú no encontrado" });
 
-      if (usuario.rol === ROLES.COORD && menu.sede.toString() !== usuario.sede.toString()) {
-        return reply.code(403).send({ error: "Solo puedes cambiar menús de tu sede" });
+      if (usuario.rol === ROLES.COORD) {
+        const sedeUser = await obtenerSedeDeUsuario(usuario.id);
+        if (!sedeUser || menu.sede.toString() !== sedeUser.toString()) {
+          return reply.code(403).send({ error: "Solo puedes cambiar menús de tu sede" });
+        }
       }
 
       menu.activo = activo;
@@ -184,8 +249,11 @@ class MenuController {
       const menu = await Menu.findById(id);
       if (!menu) return reply.code(404).send({ error: "Menú no encontrado" });
 
-      if (usuario.rol === ROLES.COORD && menu.sede.toString() !== usuario.sede.toString()) {
-        return reply.code(403).send({ error: "Solo puedes eliminar menús de tu sede" });
+      if (usuario.rol === ROLES.COORD) {
+        const sedeUser = await obtenerSedeDeUsuario(usuario.id);
+        if (!sedeUser || menu.sede.toString() !== sedeUser.toString()) {
+          return reply.code(403).send({ error: "Solo puedes eliminar menús de tu sede" });
+        }
       }
 
       await Menu.findByIdAndDelete(id);
@@ -251,7 +319,7 @@ class MenuController {
         .lean();
 
       if (sede) {
-        const sedeDoc = await Sede.findById(sede);
+        const sedeDoc = await buscarSedePorIdONombre(sede);
         if (!sedeDoc) return reply.code(400).send({ error: "La sede enviada no existe" });
         menus = menus.filter(menu => menu.sede.toString() === sedeDoc._id.toString());
       }

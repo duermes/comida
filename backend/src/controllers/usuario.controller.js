@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import Usuario from "../models/usuario.model.js";
 import Dni from "../models/dni.model.js";
 import Rol from "../models/rol.model.js";
-import Sede from "../models/Sede.model.js";
+import Sede from "../models/sede.model.js";
 import Menu from "../models/menu.model.js";
 import PlatoCarta from "../models/platosCarta.model.js";
 import { ROLES } from "../lib/utils.js";

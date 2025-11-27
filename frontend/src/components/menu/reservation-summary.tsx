@@ -200,12 +200,10 @@ export default function ReservationSummary({
     }
   };
 
-  const executiveOptions = menu.ejecutivo ?? {
-    entradas: [],
-    segundos: [],
-    postres: [],
-    bebidas: [],
-  };
+  const executiveOptions = useMemo(
+    () => menu.ejecutivo ?? {entradas: [], segundos: [], postres: [], bebidas: []},
+    [menu.ejecutivo]
+  );
 
   // Para menús 'normal' convertimos los campos individuales en arrays
   const [normalPool, setNormalPool] =
@@ -216,16 +214,65 @@ export default function ReservationSummary({
       bebidas: PlatoMenuItem[];
     }>({entradas: [], segundos: [], postres: [], bebidas: []});
 
-  // Construir opciones para normal a partir del pool de platos por sede
-  const normalOptions = {
-    entradas: normalPool.entradas,
-    segundos: normalPool.segundos,
-    postres: normalPool.postres,
-    bebidas: normalPool.bebidas,
-  };
+  // Construir opciones para normal a partir del pool de platos por sede o del menú actual como fallback
+  const normalOptions = useMemo(
+    () => ({
+      entradas:
+        normalPool.entradas.length > 0
+          ? normalPool.entradas
+          : menu.normal?.entrada
+            ? [{ _id: menu.normal.entrada._id ?? "", nombre: menu.normal.entrada.nombre ?? "Entrada" }]
+            : [],
+      segundos:
+        normalPool.segundos.length > 0
+          ? normalPool.segundos
+          : menu.normal?.segundo
+            ? [{ _id: menu.normal.segundo._id ?? "", nombre: menu.normal.segundo.nombre ?? "Segundo" }]
+            : [],
+      postres: normalPool.postres,
+      bebidas:
+        normalPool.bebidas.length > 0
+          ? normalPool.bebidas
+          : menu.normal?.bebida
+            ? [{ _id: menu.normal.bebida._id ?? "", nombre: menu.normal.bebida.nombre ?? "Bebida" }]
+            : [],
+    }),
+    [normalPool, menu.normal]
+  );
 
-  const selectionOptions =
-    reservation.variant === "ejecutivo" ? executiveOptions : normalOptions;
+  const selectionOptions = useMemo(
+    () =>
+      reservation.variant === "ejecutivo"
+        ? executiveOptions
+        : normalOptions,
+    [reservation.variant, executiveOptions, normalOptions]
+  );
+
+  // Asegurar que siempre haya un valor seleccionado cuando existan opciones
+  useEffect(() => {
+    setExecutiveSelection((prev) => {
+      const next = {...prev};
+      const ensure = (
+        key: keyof ExecutiveSelection,
+        options: Array<{_id: string; nombre: string}>
+      ) => {
+        if (!options.length) return;
+        if (!next[key] || !options.some((opt) => opt._id === next[key])) {
+          next[key] = options[0]._id;
+        }
+      };
+      ensure("entrada", selectionOptions.entradas);
+      ensure("segundo", selectionOptions.segundos);
+      ensure("postre", selectionOptions.postres);
+      ensure("bebida", selectionOptions.bebidas);
+      return next;
+    });
+  }, [
+    selectionOptions.entradas,
+    selectionOptions.segundos,
+    selectionOptions.postres,
+    selectionOptions.bebidas,
+  ]);
 
   // Cargar pool de platos (solo para menús 'normal')
   useEffect(() => {
@@ -358,7 +405,7 @@ export default function ReservationSummary({
 
       <div className="space-y-3 mb-6 pb-6 border-b border-border text-sm">
         <InfoRow label="Menú" value={reservation.title} />
-        <InfoRow label="Comedor" value={menu.sede} />
+        <InfoRow label="Comedor" value={menu.sedeNombre ?? menu.sede} />
         <InfoRow label="Fecha" value={formattedDate} />
         <InfoRow
           label="Cantidad"

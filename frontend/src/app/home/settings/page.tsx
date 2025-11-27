@@ -165,7 +165,14 @@ export default function SettingsPage() {
             <Field label="Documento" value={profile.dni ?? "No registrado"} />
             <Field label="Tipo" value={profile.tipo} />
             <Field label="Rol" value={profile.rol} />
-            <Field label="Sede" value={profile.sede ?? "Sin sede"} />
+            <Field
+              label="Sede"
+              value={
+                profile.sedeNombre ??
+                profile.sede ??
+                "Sin sede"
+              }
+            />
           </div>
         ) : (
           <p className="text-foreground-secondary">

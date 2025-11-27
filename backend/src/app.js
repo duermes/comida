@@ -11,6 +11,7 @@ import platosCartaRoutes from "./routes/platosCarta.routes.js";
 import platosMenuRoutes from "./routes/platosMenu.routes.js";
 import usuarioRoutes from "./routes/usuario.routes.js";
 import reservaMasivaRoutes from "./routes/reservaMasiva.routes.js";
+import sedeRoutes from "./routes/sede.routes.js";
 
 const app = Fastify({logger: true});
 
@@ -51,6 +52,7 @@ await app.register(platosCartaRoutes, {prefix: "/api/platos-carta"});
 await app.register(platosMenuRoutes, {prefix: "/api/platos-menu"});
 await app.register(usuarioRoutes, {prefix: "/api/usuarios"});
 app.register(reservaMasivaRoutes, {prefix: "/api"});
+await app.register(sedeRoutes, {prefix: "/api/sedes"});
 
 // Ruta base de prueba
 app.get("/", async () => ({message: "Servidor Fastify operativo"}));

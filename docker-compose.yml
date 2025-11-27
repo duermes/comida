@@ -4,7 +4,7 @@ services:
     environment:
       - NODE_ENV=development
       - CHOKIDAR_USEPOLLING=1
-      - WATCHPACK_POLLING=trueS
+      - WATCHPACK_POLLING=true
     ports:
       - "3000:3000"
     volumes:

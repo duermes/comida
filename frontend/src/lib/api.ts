@@ -115,6 +115,7 @@ export interface UsuarioPerfil {
   dni?: string;
   tipo: string;
   sede?: string;
+  sedeNombre?: string | null;
   mfaEnabled?: boolean;
 }
 
@@ -132,6 +133,7 @@ export interface PopulatedMenu {
   id?: string;
   fecha: string;
   sede: string;
+  sedeNombre?: string | null;
   precioNormal: number;
   precioEjecutivo: number;
   normal: {
@@ -153,7 +155,7 @@ export interface PedidoResponse {
   usuarioId: string;
   usuarioNombre?: string;
   usuarioCorreo?: string;
-  sede: string;
+  sede: string | {_id?: string; nombre?: string; direccion?: string};
   items: Array<{
     refId: string;
     tipo: string;
@@ -163,8 +165,8 @@ export interface PedidoResponse {
     imagenUrl?: string;
   }>;
   total: number;
-  estado: string;
-  metodoPago: string;
+  estado: string | {_id?: string; nombre?: string};
+  metodoPago: string | {_id?: string; nombre?: string};
   creadoEn: string;
 }
 
@@ -210,6 +212,12 @@ export interface UsuarioItem {
   sede?: string;
   correo?: string;
   activo: boolean;
+}
+
+export interface SedeItem {
+  _id: string;
+  nombre: string;
+  direccion?: string;
 }
 
 export interface EncuestaOpcionResultado {
@@ -432,6 +440,10 @@ export async function getResultadosEncuestas(params: {sede?: string} = {}) {
     ? `/api/menus/encuestas/resumen?${qs}`
     : "/api/menus/encuestas/resumen";
   return request<EncuestaMenuResultado[]>(path);
+}
+
+export async function getSedes() {
+  return request<SedeItem[]>("/api/sedes");
 }
 
 export interface MfaSetupResponse {

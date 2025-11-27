@@ -54,6 +54,13 @@ export default function MenuPage() {
       setLoadingMenus(true);
       setError(null);
       try {
+        const getSedeLabel = (menu: PopulatedMenu) => {
+          if (menu.sede && typeof menu.sede === "object" && "nombre" in menu.sede) {
+            return (menu.sede as any).nombre as string;
+          }
+          return typeof menu.sede === "string" ? menu.sede : "";
+        };
+
         const query: {sede?: string; fecha?: string} = {};
         if (selectedSede !== "Todas") {
           query.sede = selectedSede;
@@ -67,9 +74,8 @@ export default function MenuPage() {
         setAvailableSedes((prev) => {
           const next = new Set(prev);
           response.forEach((menu) => {
-            if (menu.sede) {
-              next.add(menu.sede);
-            }
+            const label = getSedeLabel(menu);
+            if (label) next.add(label);
           });
           return Array.from(next).sort((a, b) => a.localeCompare(b));
         });
@@ -90,6 +96,15 @@ export default function MenuPage() {
     const loadFavorites = async () => {
       setLoadingFavorites(true);
       try {
+        // Evitar error de token cuando no hay sesión
+        const token =
+          typeof window !== "undefined"
+            ? window.localStorage.getItem("authToken")
+            : null;
+        if (!token) {
+          setFavorites(new Set());
+          return;
+        }
         const response = await getFavoritos();
         const favoriteMenus = response
           .filter(
@@ -146,6 +161,13 @@ export default function MenuPage() {
   const items = useMemo<DisplayMenuItem[]>(() => {
     const term = searchTerm.trim().toLowerCase();
 
+    const getSedeLabel = (menu: PopulatedMenu) => {
+      if (menu.sede && typeof menu.sede === "object" && "nombre" in menu.sede) {
+        return (menu.sede as any).nombre as string;
+      }
+      return typeof menu.sede === "string" ? menu.sede : "";
+    };
+
     return menus
       .filter((menu) => menu.activo)
       .flatMap<DisplayMenuItem>((menu) => {
@@ -155,6 +177,7 @@ export default function MenuPage() {
           return [];
         }
         const formattedDate = new Date(menu.fecha).toLocaleDateString();
+        const sedeLabel = getSedeLabel(menu);
 
         const normalCard: DisplayMenuItem = {
           id: `${menuId}-normal`,
@@ -171,7 +194,7 @@ export default function MenuPage() {
           price: menu.precioNormal,
           image:
             menu.normal.segundo?.imagenUrl ?? menu.normal.entrada?.imagenUrl,
-          sede: menu.sede,
+          sede: sedeLabel,
           isFavorite: favorites.has(menuId),
           menu,
         };
@@ -203,7 +226,7 @@ export default function MenuPage() {
           image:
             menu.ejecutivo.segundos?.[0]?.imagenUrl ??
             menu.normal.segundo?.imagenUrl,
-          sede: menu.sede,
+          sede: sedeLabel,
           isFavorite: favorites.has(menuId),
           menu,
         };

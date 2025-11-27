@@ -1,7 +1,7 @@
 import Pedido from "../models/pedido.model.js";
 import PlatoCarta from "../models/platosCarta.model.js";
 import Menu from "../models/menu.model.js";
-import Sede from "../models/Sede.model.js";
+import Sede from "../models/sede.model.js";
 import EstadoPedido from "../models/estadoPedido.model.js";
 import MetodoPago from "../models/metodoPago.model.js";
 import Usuario from "../models/usuario.model.js";
@@ -16,18 +16,26 @@ class PedidoController {
         return reply.code(403).send({ error: "Solo los usuarios pueden crear pedidos" });
 
       const { sede, items, metodoPago, estado } = req.body;
-      if (!sede || !items?.length || !metodoPago || !estado)
+      if (!sede || !items?.length)
         return reply.code(400).send({ error: "Datos de pedido incompletos" });
 
       // Validar referencias
       const sedeDoc = await Sede.findById(sede);
       if (!sedeDoc) return reply.code(400).send({ error: "Sede no existe" });
 
-      const estadoDoc = await EstadoPedido.findById(estado);
-      if (!estadoDoc) return reply.code(400).send({ error: "Estado de pedido inválido" });
+      let estadoDoc = estado ? await EstadoPedido.findById(estado) : null;
+      if (!estadoDoc) {
+        estadoDoc =
+          (await EstadoPedido.findOne({ nombre: /pendiente/i })) ||
+          (await EstadoPedido.create({ nombre: "Pendiente" }));
+      }
 
-      const metodoPagoDoc = await MetodoPago.findById(metodoPago);
-      if (!metodoPagoDoc) return reply.code(400).send({ error: "Método de pago inválido" });
+      let metodoPagoDoc = metodoPago ? await MetodoPago.findById(metodoPago) : null;
+      if (!metodoPagoDoc) {
+        metodoPagoDoc =
+          (await MetodoPago.findOne({ nombre: /efectivo/i })) ||
+          (await MetodoPago.create({ nombre: "Efectivo" }));
+      }
 
       let total = 0;
       const itemsValidados = [];

@@ -106,7 +106,7 @@ export default function UsersPage() {
     return usuarios.filter((usuario) => {
       const values = [
         usuario.nombre,
-        usuario.rol,
+        typeof usuario.rol === "string" ? usuario.rol : "",
         usuario.tipo,
         usuario.codigoUsu,
         usuario.dni,
@@ -121,9 +121,9 @@ export default function UsersPage() {
   const roleOptions = useMemo(() => {
     const roles = new Set<string>();
     usuarios.forEach((usuario) => {
-      if (usuario.rol) roles.add(usuario.rol);
+      if (usuario?.rol) roles.add(String(usuario.rol));
     });
-    return Array.from(roles).sort((a, b) => a.localeCompare(b));
+    return Array.from(roles).sort((a, b) => (a ?? "").localeCompare(b ?? ""));
   }, [usuarios]);
 
   const typeOptions = useMemo(() => {
