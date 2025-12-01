@@ -39,9 +39,18 @@ export default function ReservationSummary({
   const [scheduledDate, setScheduledDate] = useState<string>("");
 
   const menu = reservation.menu;
-  const isCoordinator = currentUser?.rol === "coordinador";
-  const maxQuantity = isCoordinator ? 100 : 5;
+  const userRole = currentUser?.rol?.toLowerCase() ?? "";
+  const hasBulkPrivileges = userRole === "coordinador" || userRole === "profesor";
+  const isCoordinator = userRole === "coordinador";
+  const maxQuantity = hasBulkPrivileges ? 200 : 5;
   const todayISO = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const menuDateISO = useMemo(() => {
+    try {
+      return format(new Date(menu.fecha), "yyyy-MM-dd");
+    } catch (error) {
+      return "";
+    }
+  }, [menu.fecha]);
 
   const menuSedeId = useMemo(() => {
     const raw = menu.sede;
@@ -109,14 +118,9 @@ export default function ReservationSummary({
     setSurveySelection([]);
     setFeedback(null);
     setSurveyFeedback(null);
-    try {
-      const initial = format(new Date(menu.fecha), "yyyy-MM-dd");
-      setScheduledDate(initial);
-    } catch (error) {
-      setScheduledDate("");
-    }
+    setScheduledDate(menuDateISO);
     setQuantity(1);
-  }, [menu.ejecutivo, menu.fecha, reservation]);
+  }, [menu.ejecutivo, menuDateISO, reservation]);
 
   const handleExecutiveSelect = (
     field: keyof ExecutiveSelection,
@@ -178,9 +182,11 @@ export default function ReservationSummary({
     setIsSubmitting(true);
     setFeedback(null);
     try {
+      const fechaEntregaValue = hasBulkPrivileges && scheduledDate ? scheduledDate : undefined;
+
       const pedido = await crearPedido({
         sede: menuSedeId,
-        fechaEntrega: scheduledDate || undefined,
+        ...(fechaEntregaValue ? {fechaEntrega: fechaEntregaValue} : {}),
         items: [
           {
             refId: menuId,
@@ -418,26 +424,42 @@ export default function ReservationSummary({
             </button>
           </div>
           <p className="mt-1 text-xs text-foreground-secondary">
-            {isCoordinator
-              ? `Puedes solicitar hasta ${maxQuantity} unidades por pedido.`
+            {hasBulkPrivileges
+              ? `Puedes solicitar pedidos masivos desde tu perfil institucional (hasta ${maxQuantity} unidades por pedido).`
               : `Máximo ${maxQuantity} unidades por pedido.`}
           </p>
         </div>
 
-        {isCoordinator && (
+        {hasBulkPrivileges && (
           <div>
             <label className="block text-sm font-medium text-foreground">
               Programar fecha de entrega
             </label>
-            <Input
-              type="date"
-              value={scheduledDate || ""}
-              min={todayISO}
-              onChange={(event) => setScheduledDate(event.target.value)}
-              className="mt-2"
-            />
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <Input
+                type="date"
+                value={scheduledDate || ""}
+                min={todayISO}
+                onChange={(event) => setScheduledDate(event.target.value)}
+                className="w-48"
+              />
+              <button
+                type="button"
+                onClick={() => setScheduledDate(menuDateISO)}
+                className="px-3 py-2 text-sm font-medium text-primary border border-primary/20 rounded-lg bg-primary/5 hover:bg-primary/10 transition-smooth"
+              >
+                Usar fecha del menú
+              </button>
+              <button
+                type="button"
+                onClick={() => setScheduledDate("")}
+                className="px-3 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-background-secondary transition-smooth"
+              >
+                Sin programación
+              </button>
+            </div>
             <p className="mt-1 text-xs text-foreground-secondary">
-              Selecciona la fecha en la que se requiere el pedido masivo.
+              Deja la programación vacía para utilizar la fecha del menú o selecciona un día futuro para pedidos especiales.
             </p>
           </div>
         )}

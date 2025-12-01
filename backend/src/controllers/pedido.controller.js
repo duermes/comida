@@ -259,6 +259,7 @@ function buildPedidoResponse(pedido) {
     metodoPago: metodoInfo.value,
     metodoPagoNombre: metodoInfo.nombre,
     metodoPagoId: metodoInfo.id,
+    fechaEntrega: pedido.fechaEntrega ?? null,
     creadoEn: pedido.creadoEn ?? pedido.createdAt ?? null,
     actualizadoEn: pedido.actualizadoEn ?? pedido.updatedAt ?? null,
   };
@@ -478,10 +479,14 @@ class PedidoController {
   static async crearPedido(req, reply) {
     try {
       const usuario = req.user;
-      if (!usuario || usuario.rol !== ROLES.USER)
-        return reply.code(403).send({ error: "Solo los usuarios pueden crear pedidos" });
+      const allowedRoles = new Set([ROLES.USER, ROLES.COORD, ROLES.PROFESOR]);
+      if (!usuario || !allowedRoles.has(usuario.rol)) {
+        return reply
+          .code(403)
+          .send({ error: "Solo usuarios, profesores y coordinadores pueden crear pedidos" });
+      }
 
-      const { sede, items, metodoPago, estado } = req.body;
+      const { sede, items, metodoPago, estado, fechaEntrega } = req.body;
       if (!sede || !items?.length)
         return reply.code(400).send({ error: "Datos de pedido incompletos" });
 
@@ -500,6 +505,30 @@ class PedidoController {
         metodoPagoDoc =
           (await MetodoPago.findOne({ nombre: /efectivo/i })) ||
           (await MetodoPago.create({ nombre: "Efectivo" }));
+      }
+
+      let fechaEntregaDate = null;
+      if (fechaEntrega != null && fechaEntrega !== "") {
+        if (usuario.rol !== ROLES.COORD && usuario.rol !== ROLES.PROFESOR) {
+          return reply
+            .code(403)
+            .send({ error: "No tienes permisos para programar la fecha de entrega" });
+        }
+
+        const parsed = new Date(fechaEntrega);
+        if (Number.isNaN(parsed.getTime())) {
+          return reply.code(400).send({ error: "La fecha de entrega es inválida" });
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const parsedCopy = new Date(parsed);
+        parsedCopy.setHours(0, 0, 0, 0);
+        if (parsedCopy < today) {
+          return reply.code(400).send({ error: "La fecha de entrega debe ser igual o posterior a hoy" });
+        }
+
+        fechaEntregaDate = parsed;
       }
 
       let total = 0;
@@ -528,6 +557,7 @@ class PedidoController {
         estado: estadoDoc._id,
         metodoPago: metodoPagoDoc._id,
         items: itemsValidados,
+        fechaEntrega: fechaEntregaDate,
         total,
       });
 
@@ -572,8 +602,14 @@ class PedidoController {
         if (!sedeFiltrada) {
           return reply.code(400).send({ error: "No se pudo determinar la sede asociada al coordinador" });
         }
+        const sedeObjectId = new Types.ObjectId(sedeFiltrada);
+        const usuarioIdString = toObjectIdString(usuario.id);
+        const orConditions = [{ sede: sedeObjectId }];
+        if (usuarioIdString && Types.ObjectId.isValid(usuarioIdString)) {
+          orConditions.push({ usuarioId: new Types.ObjectId(usuarioIdString) });
+        }
 
-        filtros.sede = sedeFiltrada;
+        filtros.$or = orConditions;
       } else if (usuario.rol === ROLES.ADMIN && sede) {
         const sedeFiltrada = await normalizeSedeFilter(sede);
         if (!sedeFiltrada) {

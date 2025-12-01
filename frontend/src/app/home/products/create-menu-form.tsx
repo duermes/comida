@@ -53,25 +53,29 @@ export default function CreateMenuForm({platos, sedeOptions, onCancel, onCreated
   const entradas = useMemo(
     () =>
       platos.filter(
-        (p) => p.tipo === "entrada" && filterBySelectedSede(p)
+        (p) => p.activo && p.tipo === "entrada" && filterBySelectedSede(p)
       ),
     [platos, filterBySelectedSede]
   );
   const segundos = useMemo(
     () =>
       platos.filter(
-        (p) => p.tipo === "segundo" && filterBySelectedSede(p)
+        (p) => p.activo && p.tipo === "segundo" && filterBySelectedSede(p)
       ),
     [platos, filterBySelectedSede]
   );
   const postres = useMemo(
     () =>
-      platos.filter((p) => p.tipo === "postre" && filterBySelectedSede(p)),
+      platos.filter(
+        (p) => p.activo && p.tipo === "postre" && filterBySelectedSede(p)
+      ),
     [platos, filterBySelectedSede]
   );
   const bebidas = useMemo(
     () =>
-      platos.filter((p) => p.tipo === "bebida" && filterBySelectedSede(p)),
+      platos.filter(
+        (p) => p.activo && p.tipo === "bebida" && filterBySelectedSede(p)
+      ),
     [platos, filterBySelectedSede]
   );
 

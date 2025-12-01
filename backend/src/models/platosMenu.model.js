@@ -15,13 +15,17 @@ const PlatoMenuSchema = new mongoose.Schema({
 });
 
 // Middleware: si el stock llega a 0, desactiva el plato automáticamente
-PlatoMenuSchema.pre('save', function (next) {
-  if (this.stock <= 0 && this.activo) {
+PlatoMenuSchema.pre("save", function (next) {
+  const stockModificado = this.isModified("stock") || this.isNew;
+  const activoModificado = this.isModified("activo");
+
+  if (stockModificado && this.stock <= 0) {
     this.activo = false;
-  } else if (this.stock > 0 && !this.activo) {
-  // Si vuelve a haber stock, se reactiva automáticamente
+  } else if (stockModificado && this.stock > 0 && !activoModificado) {
+    // Solo reactivar automáticamente cuando el cambio proviene del stock
     this.activo = true;
   }
+
   next();
 });
 

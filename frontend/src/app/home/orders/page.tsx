@@ -14,6 +14,10 @@ interface UIOrder {
   date: string;
   time: string;
   image?: string | null;
+  quantity: number;
+  total: number;
+  isScheduled: boolean;
+  scheduleLabel?: string;
 }
 
 const STATUS_MAP: Record<string, string> = {
@@ -48,7 +52,15 @@ export default function OrdersPage() {
   const {currentOrders, pastOrders} = useMemo(() => {
     const transform = (pedido: PedidoResponse): UIOrder => {
       const primerItem = pedido.items?.[0];
-      const fecha = new Date(pedido.creadoEn);
+      const parseDate = (value?: string | null) => {
+        if (!value) return null;
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      };
+
+      const fechaEntregaDate = parseDate(pedido.fechaEntrega ?? null);
+      const creadoEnDate = parseDate(pedido.creadoEn);
+      const referenciaDate = fechaEntregaDate ?? creadoEnDate;
 
       const estadoBase =
         typeof pedido.estado === "string"
@@ -72,6 +84,23 @@ export default function OrdersPage() {
             : sedeFuente
           : "Sin sede";
 
+      const scheduleLabel = fechaEntregaDate
+        ? `Entrega programada para ${fechaEntregaDate.toLocaleDateString()}`
+        : undefined;
+      const timeLabel = fechaEntregaDate
+        ? ""
+        : creadoEnDate
+          ? creadoEnDate.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "";
+      const dateLabel = referenciaDate
+        ? referenciaDate.toLocaleDateString()
+        : creadoEnDate
+          ? creadoEnDate.toLocaleDateString()
+          : "Fecha no disponible";
+
       return {
         id: `#${pedido._id.slice(-6)}`,
         status,
@@ -79,12 +108,13 @@ export default function OrdersPage() {
         category: primerItem?.tipo === "menu" ? "Menú" : "Carta",
         menu: `Reserva ${pedido.items.length > 1 ? "múltiple" : "individual"}`,
         sede: sedeLabel,
-        date: fecha.toLocaleDateString(),
-        time: fecha.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        date: dateLabel,
+        time: timeLabel,
         image: primerItem?.imagenUrl ?? null,
+        quantity: pedido.items.reduce((acc, item) => acc + Number(item.cantidad ?? 0), 0),
+        total: Number(pedido.total ?? 0),
+        isScheduled: Boolean(fechaEntregaDate),
+        scheduleLabel,
       };
     };
 

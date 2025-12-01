@@ -1,7 +1,7 @@
 "use client";
 
 import {useRouter} from "next/navigation";
-import {Bell, LogOut} from "lucide-react";
+import {LogOut} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {logout} from "@/lib/api";
 
@@ -44,9 +44,6 @@ export default function Header({user}: HeaderProps) {
       </div>
 
       <div className="flex items-center space-x-6">
-        <button className="text-foreground-secondary hover:text-foreground transition-smooth">
-          <Bell size={24} />
-        </button>
         <div className="flex items-center space-x-3">
           <div className="text-right">
             <p className="text-sm font-medium text-foreground">

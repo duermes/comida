@@ -50,7 +50,7 @@ class PlatoMenuController {
 
       if (!usuario) return reply.code(401).send({ error: "No autenticado" });
 
-      let filtros = { activo: true };
+      const filtros = {};
 
       if (usuario.rol === ROLES.ADMIN) {
         if (querySede) filtros.sede = querySede;
@@ -59,6 +59,7 @@ class PlatoMenuController {
       } else {
         if (!querySede) return reply.code(403).send({ error: "Debes indicar una sede" });
         filtros.sede = querySede;
+        filtros.activo = true;
       }
 
       const platos = await PlatoMenu.find(filtros).populate("sede");

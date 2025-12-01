@@ -16,7 +16,7 @@ export async function verificarToken(req, reply) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Buscar el usuario en la base de datos
-    const usuario = await Usuario.findById(decoded.id);
+    const usuario = await Usuario.findById(decoded.id).populate("rol");
     if (!usuario) {
       return reply.code(401).send({ message: "Usuario no encontrado" });
     }
@@ -26,11 +26,15 @@ export async function verificarToken(req, reply) {
     }
 
     // Guardar la información del usuario en req.user
+    const rolNombre = typeof usuario.rol === "object" && usuario.rol !== null
+      ? usuario.rol.nombre ?? usuario.rol
+      : usuario.rol;
+
     req.user = {
       id: usuario._id,
-      rol: usuario.rol,
+      rol: rolNombre,
       sede: usuario.sede,
-      nombre: usuario.nombre
+      nombre: usuario.nombre,
     };
 
   } catch (error) {

@@ -188,6 +188,7 @@ export interface PedidoResponse {
   metodoPago: string | {_id?: string | null; nombre?: string | null} | null;
   metodoPagoNombre?: string | null;
   metodoPagoId?: string | null;
+  fechaEntrega?: string | null;
   creadoEn: string;
   actualizadoEn?: string | null;
 }

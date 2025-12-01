@@ -15,6 +15,7 @@ const PedidoSchema = new mongoose.Schema(
         usuarioId: { type: mongoose.Schema.Types.ObjectId, ref: "Usuario", required: true },
         sede: { type: mongoose.Schema.Types.ObjectId, ref: "Sede", required: true },
         items: { type: [ItemPedidoSchema], required: true },
+        fechaEntrega: { type: Date, default: null },
         total: { type: Number, required: true },
         estado: { type: mongoose.Schema.Types.ObjectId, ref: "EstadoPedido", required: true },
         metodoPago: { type: mongoose.Schema.Types.ObjectId, ref: "MetodoPago", required: true },
