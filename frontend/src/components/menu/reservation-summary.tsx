@@ -43,6 +43,31 @@ export default function ReservationSummary({
   const maxQuantity = isCoordinator ? 100 : 5;
   const todayISO = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
 
+  const menuSedeId = useMemo(() => {
+    const raw = menu.sede;
+    if (!raw) return "";
+    if (typeof raw === "string") return raw.trim();
+    if (typeof raw === "object" && raw !== null) {
+      return raw._id?.toString().trim() ?? "";
+    }
+    return "";
+  }, [menu.sede]);
+
+  const menuSedeNombre = useMemo(() => {
+    const nombreDirecto = menu.sedeNombre?.toString().trim();
+    if (nombreDirecto) return nombreDirecto;
+    const raw = menu.sede;
+    if (!raw) return "";
+    if (typeof raw === "string") return raw.trim();
+    if (typeof raw === "object" && raw !== null) {
+      const nombre = raw.nombre?.toString().trim();
+      if (nombre) return nombre;
+      const id = raw._id?.toString().trim();
+      return id ?? "";
+    }
+    return "";
+  }, [menu.sedeNombre, menu.sede]);
+
   const formattedDate = useMemo(() => {
     if (!scheduledDate) {
       try {
@@ -145,11 +170,16 @@ export default function ReservationSummary({
       return;
     }
 
+    if (!menuSedeId) {
+      setFeedback("No se pudo determinar la sede del menú seleccionado.");
+      return;
+    }
+
     setIsSubmitting(true);
     setFeedback(null);
     try {
       const pedido = await crearPedido({
-        sede: menu.sede,
+        sede: menuSedeId,
         fechaEntrega: scheduledDate || undefined,
         items: [
           {
@@ -279,11 +309,21 @@ export default function ReservationSummary({
     let mounted = true;
     async function loadPlatos() {
       if (reservation.variant !== "normal") return;
+      if (!menuSedeId) return;
       try {
-        const platos = await getPlatosMenu({sede: menu.sede});
+        const platos = await getPlatosMenu({sede: menuSedeId});
         if (!mounted) return;
         // Filtrar por sede y activos
-        const filtered = platos.filter((p) => p.sede === menu.sede && p.activo);
+        const filtered = platos.filter((p) => {
+          const platoSedeId =
+            typeof p.sede === "string"
+              ? p.sede.trim()
+              : typeof p.sede === "object" && p.sede !== null
+                ? p.sede._id?.toString().trim() ?? ""
+                : "";
+
+          return platoSedeId === menuSedeId && p.activo;
+        });
         const entradas = filtered.filter((p) => p.tipo === "entrada");
         const segundos = filtered.filter((p) => p.tipo === "segundo");
         const postres = filtered.filter((p) => p.tipo === "postre");
@@ -298,7 +338,7 @@ export default function ReservationSummary({
     return () => {
       mounted = false;
     };
-  }, [reservation.variant, menu.sede]);
+  }, [reservation.variant, menu.sede, menuSedeId]);
 
   return (
     <aside className="w-96 bg-white border-l border-border overflow-auto p-6 flex flex-col">
@@ -405,7 +445,7 @@ export default function ReservationSummary({
 
       <div className="space-y-3 mb-6 pb-6 border-b border-border text-sm">
         <InfoRow label="Menú" value={reservation.title} />
-        <InfoRow label="Comedor" value={menu.sedeNombre ?? menu.sede} />
+        <InfoRow label="Comedor" value={menuSedeNombre || "Sin sede definida"} />
         <InfoRow label="Fecha" value={formattedDate} />
         <InfoRow
           label="Cantidad"

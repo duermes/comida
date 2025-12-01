@@ -99,31 +99,54 @@ export default function UsersPage() {
     loadUsuarios();
   }, [authorized, loadUsuarios]);
 
+  const getRolNombre = useCallback((usuario: UsuarioItem) => {
+    if (!usuario.rol) return "";
+    if (typeof usuario.rol === "string") return usuario.rol;
+    return usuario.rol?.nombre ?? "";
+  }, []);
+
+  const getDniNumero = useCallback((usuario: UsuarioItem) => {
+    if (!usuario.dni) return "";
+    if (typeof usuario.dni === "string") return usuario.dni;
+    return usuario.dni?.numero ?? "";
+  }, []);
+
   const filteredUsuarios = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return usuarios;
 
     return usuarios.filter((usuario) => {
+      const dniNumero = getDniNumero(usuario);
+      const rolNombre = getRolNombre(usuario);
       const values = [
         usuario.nombre,
-        typeof usuario.rol === "string" ? usuario.rol : "",
+        rolNombre,
         usuario.tipo,
         usuario.codigoUsu,
-        usuario.dni,
+        dniNumero,
       ];
 
       return values.some((value) =>
         value ? value.toLowerCase().includes(term) : false
       );
     });
-  }, [usuarios, searchTerm]);
+  }, [usuarios, searchTerm, getDniNumero, getRolNombre]);
 
   const roleOptions = useMemo(() => {
-    const roles = new Set<string>();
+    const rolesMap = new Map<string, string>();
     usuarios.forEach((usuario) => {
-      if (usuario?.rol) roles.add(String(usuario.rol));
+      if (!usuario.rol) return;
+      if (typeof usuario.rol === "string") {
+        rolesMap.set(usuario.rol, usuario.rol);
+      } else {
+        const value = usuario.rol._id ?? usuario.rol.nombre ?? "";
+        const label = usuario.rol.nombre ?? value;
+        if (value) rolesMap.set(value, label);
+      }
     });
-    return Array.from(roles).sort((a, b) => (a ?? "").localeCompare(b ?? ""));
+    return Array.from(rolesMap.entries())
+      .map(([value, label]) => ({value, label}))
+      .sort((a, b) => a.label.localeCompare(b.label));
   }, [usuarios]);
 
   const typeOptions = useMemo(() => {
@@ -145,23 +168,26 @@ export default function UsersPage() {
     setFormError(null);
     setSuccessMessage(null);
     
+    const nombres = formState.nombres?.trim() ?? "";
+    const apellidos = formState.apellidos?.trim() ?? "";
+    const codigo = formState.codigoUsu?.trim().toLowerCase() ?? "";
+    const numero = formState.numero?.trim().toLowerCase() ?? "";
+    const password = formState.password?.trim() ?? "";
+    const rol = formState.rol?.trim() ?? "";
+    const tipo = formState.tipo?.trim() ?? "";
+    const sede = formState.sede?.trim() ?? "";
 
-    const nombre = formState.nombre.trim();
-    const codigo = formState.codigoUsu.trim().toLowerCase();
-    const dni = formState.dni.trim().toLowerCase();
-    const password = formState.password.trim();
-
-    if (!nombre || !password) {
-      setFormError("Completa los campos obligatorios marcados con *");
+    if (!nombres || !apellidos || !password) {
+      setFormError("Completa los nombres, apellidos y contraseña obligatorios.");
       return;
     }
 
-    if (!formState.rol || !formState.tipo) {
+    if (!rol || !tipo) {
       setFormError("Selecciona el rol y el tipo de usuario");
       return;
     }
 
-    if (!codigo && !dni) {
+    if (!codigo && !numero) {
       setFormError("Ingresa al menos un identificador (código o DNI)");
       return;
     }
@@ -169,15 +195,22 @@ export default function UsersPage() {
     setIsCreating(true);
     try {
       const created = await crearUsuario({
-        ...formState,
-        nombre,
-        codigoUsu: codigo,
-        dni,
+        nombres,
+        apellidos,
         password,
+        tipo,
+        rol,
+        numero,
+        codigoUsu: codigo,
+        sede: sede || undefined,
       });
       setShowAddModal(false);
       setFormState(createEmptyUserForm());
-      setSuccessMessage(`Usuario ${created.nombre} agregado correctamente.`);
+      const nombreCompleto = [created.nombres, created.apellidos]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      setSuccessMessage(`Usuario ${nombreCompleto || created.dni} agregado correctamente.`);
       await loadUsuarios();
     } catch (err) {
       console.error("Error al crear usuario:", err);
@@ -279,29 +312,36 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {filteredUsuarios.map((usuario) => (
-                  <tr key={usuario._id} className="hover:bg-muted/40">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-foreground">
-                        {usuario.nombre}
-                      </div>
-                      <p className="text-xs text-foreground-secondary">
-                        {usuario.dni ??
-                          usuario.codigoUsu ??
-                          "Sin identificador"}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 capitalize text-foreground-secondary">
-                      {usuario.rol}
-                    </td>
-                    <td className="px-4 py-3 capitalize text-foreground-secondary">
-                      {usuario.tipo}
-                    </td>
-                    <td className="px-4 py-3 text-foreground-secondary">
-                      {usuario.codigoUsu ?? usuario.dni ?? "-"}
-                    </td>
-                  </tr>
-                ))}
+                {filteredUsuarios.map((usuario) => {
+                  const rolNombre = getRolNombre(usuario) || "-";
+                  const dniNumero = getDniNumero(usuario);
+                  const identificadorPreferido =
+                    usuario.codigoUsu?.trim() || dniNumero || "Sin identificador";
+                  const identificadorFila =
+                    usuario.codigoUsu?.trim() || dniNumero || "-";
+
+                  return (
+                    <tr key={usuario._id} className="hover:bg-muted/40">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-foreground">
+                          {usuario.nombre}
+                        </div>
+                        <p className="text-xs text-foreground-secondary">
+                          {identificadorPreferido}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 capitalize text-foreground-secondary">
+                        {rolNombre}
+                      </td>
+                      <td className="px-4 py-3 capitalize text-foreground-secondary">
+                        {usuario.tipo}
+                      </td>
+                      <td className="px-4 py-3 text-foreground-secondary">
+                        {identificadorFila}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -328,13 +368,25 @@ export default function UsersPage() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
-                    Nombre completo
+                    Nombres
                   </label>
                   <Input
-                    name="nombre"
-                    value={formState.nombre}
+                    name="nombres"
+                    value={formState.nombres}
                     onChange={handleInputChange}
-                    placeholder="Ej. Ana Salazar"
+                    placeholder="Ej. Ana María"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Apellidos
+                  </label>
+                  <Input
+                    name="apellidos"
+                    value={formState.apellidos}
+                    onChange={handleInputChange}
+                    placeholder="Ej. Salazar Quiroz"
                     required
                   />
                 </div>
@@ -361,9 +413,9 @@ export default function UsersPage() {
                       <SelectValue placeholder="Selecciona un rol" />
                     </SelectTrigger>
                     <SelectContent>
-                      {roleOptions.map((rol) => (
-                        <SelectItem key={rol} value={rol}>
-                          {rol}
+                      {roleOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -391,13 +443,13 @@ export default function UsersPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
-                    Identificador (DNI o código)
+                    Número de documento (DNI u otro)
                   </label>
                   <Input
-                    name="dni"
-                    value={formState.dni}
+                    name="numero"
+                    value={formState.numero}
                     onChange={handleInputChange}
-                    placeholder="Código UTP o DNI"
+                    placeholder="DNI del usuario"
                   />
                 </div>
 
@@ -446,11 +498,13 @@ export default function UsersPage() {
 
 function createEmptyUserForm(): CrearUsuarioPayload {
   return {
-    nombre: "",
+    nombres: "",
+    apellidos: "",
     password: "",
     tipo: "",
     codigoUsu: "",
-    dni: "",
+    numero: "",
     rol: "",
+    sede: "",
   };
 }

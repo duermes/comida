@@ -31,6 +31,15 @@ export default function CreateMenuForm({platos, sedeOptions, onCancel, onCreated
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const resolveSedeNombre = (rawSede: PlatoMenuItem["sede"]) => {
+    if (!rawSede) return "";
+    if (typeof rawSede === "string") return rawSede;
+    if (typeof rawSede === "object") {
+      return rawSede?.nombre ?? rawSede?._id ?? "";
+    }
+    return "";
+  };
+
   const entradas = useMemo(() => platos.filter((p) => p.tipo === "entrada"), [platos]);
   const segundos = useMemo(() => platos.filter((p) => p.tipo === "segundo"), [platos]);
   const postres = useMemo(() => platos.filter((p) => p.tipo === "postre"), [platos]);
@@ -111,21 +120,33 @@ export default function CreateMenuForm({platos, sedeOptions, onCancel, onCreated
             <label className="text-sm">Entrada</label>
             <select value={normalEntrada} onChange={(e) => setNormalEntrada(e.target.value)} className="w-full rounded-lg border px-3 py-2">
               <option value="">Seleccionar</option>
-              {entradas.map((p) => (<option key={p._id} value={p._id}>{p.nombre} - {p.sede}</option>))}
+              {entradas.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.nombre} - {resolveSedeNombre(p.sede) || "General"}
+                </option>
+              ))}
             </select>
           </div>
           <div className="space-y-2">
             <label className="text-sm">Segundo</label>
             <select value={normalSegundo} onChange={(e) => setNormalSegundo(e.target.value)} className="w-full rounded-lg border px-3 py-2">
               <option value="">Seleccionar</option>
-              {segundos.map((p) => (<option key={p._id} value={p._id}>{p.nombre} - {p.sede}</option>))}
+              {segundos.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.nombre} - {resolveSedeNombre(p.sede) || "General"}
+                </option>
+              ))}
             </select>
           </div>
           <div className="space-y-2">
             <label className="text-sm">Bebida</label>
             <select value={normalBebida} onChange={(e) => setNormalBebida(e.target.value)} className="w-full rounded-lg border px-3 py-2">
               <option value="">Seleccionar</option>
-              {bebidas.map((p) => (<option key={p._id} value={p._id}>{p.nombre} - {p.sede}</option>))}
+              {bebidas.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.nombre} - {resolveSedeNombre(p.sede) || "General"}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -143,7 +164,7 @@ export default function CreateMenuForm({platos, sedeOptions, onCancel, onCreated
               {entradas.map((p) => (
                 <label key={p._id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={ejEntradas.includes(p._id)} onChange={() => toggleArray(ejEntradas, setEjEntradas, p._id)} />
-                  <span>{p.nombre} - {p.sede}</span>
+                  <span>{p.nombre} - {resolveSedeNombre(p.sede) || "General"}</span>
                 </label>
               ))}
             </div>
@@ -155,7 +176,7 @@ export default function CreateMenuForm({platos, sedeOptions, onCancel, onCreated
               {segundos.map((p) => (
                 <label key={p._id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={ejSegundos.includes(p._id)} onChange={() => toggleArray(ejSegundos, setEjSegundos, p._id)} />
-                  <span>{p.nombre} - {p.sede}</span>
+                  <span>{p.nombre} - {resolveSedeNombre(p.sede) || "General"}</span>
                 </label>
               ))}
             </div>
@@ -167,7 +188,7 @@ export default function CreateMenuForm({platos, sedeOptions, onCancel, onCreated
               {postres.map((p) => (
                 <label key={p._id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={ejPostres.includes(p._id)} onChange={() => toggleArray(ejPostres, setEjPostres, p._id)} />
-                  <span>{p.nombre} - {p.sede}</span>
+                  <span>{p.nombre} - {resolveSedeNombre(p.sede) || "General"}</span>
                 </label>
               ))}
             </div>
@@ -179,7 +200,7 @@ export default function CreateMenuForm({platos, sedeOptions, onCancel, onCreated
               {bebidas.map((p) => (
                 <label key={p._id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={ejBebidas.includes(p._id)} onChange={() => toggleArray(ejBebidas, setEjBebidas, p._id)} />
-                  <span>{p.nombre} - {p.sede}</span>
+                  <span>{p.nombre} - {resolveSedeNombre(p.sede) || "General"}</span>
                 </label>
               ))}
             </div>

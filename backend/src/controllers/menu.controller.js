@@ -357,6 +357,8 @@ class MenuController {
             }
           }
 
+          const totalVotos = [...contador.values()].reduce((sum, value) => sum + value, 0);
+
           const opciones = [...contador.entries()]
             .map(([opcionId, votos]) => {
               const plato = platoMap.get(opcionId);
@@ -369,6 +371,7 @@ class MenuController {
             fecha: menu.fecha,
             sede: menu.sede,
             totalEncuestas: encuestasMenu.length,
+            totalVotos,
             opciones,
           };
         })

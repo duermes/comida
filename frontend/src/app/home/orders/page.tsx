@@ -47,22 +47,30 @@ export default function OrdersPage() {
 
   const {currentOrders, pastOrders} = useMemo(() => {
     const transform = (pedido: PedidoResponse): UIOrder => {
-      const primerItem = pedido.items[0];
+      const primerItem = pedido.items?.[0];
       const fecha = new Date(pedido.creadoEn);
 
-      const estadoRaw =
+      const estadoBase =
         typeof pedido.estado === "string"
           ? pedido.estado
-          : pedido.estado?.nombre ?? "pendiente";
-      const status = STATUS_MAP[estadoRaw.toLowerCase?.() ?? estadoRaw] ?? estadoRaw;
+          : pedido.estado?.nombre ?? pedido.estadoNombre ?? "pendiente";
+      const estadoKey = estadoBase?.toLowerCase?.() ?? "pendiente";
+      const status = STATUS_MAP[estadoKey] ?? pedido.estadoNombre ?? estadoBase;
 
       const isObjectId = (value: string) =>
         /^[a-f\d]{24}$/i.test(value.trim());
 
+      const sedeFuente =
+        pedido.sedeNombre ??
+        (typeof pedido.sede === "string"
+          ? pedido.sede
+          : pedido.sede?.nombre ?? pedido.sede?._id ?? "");
       const sedeLabel =
-        typeof pedido.sede === "string"
-          ? isObjectId(pedido.sede) ? "Sede no disponible" : pedido.sede
-          : pedido.sede?.nombre ?? "Sin sede";
+        typeof sedeFuente === "string" && sedeFuente.trim()
+          ? isObjectId(sedeFuente)
+            ? "Sede no disponible"
+            : sedeFuente
+          : "Sin sede";
 
       return {
         id: `#${pedido._id.slice(-6)}`,
@@ -82,8 +90,13 @@ export default function OrdersPage() {
 
     const partitioned = orders.reduce(
       (acc, pedido) => {
+        const estadoBase =
+          typeof pedido.estado === "string"
+            ? pedido.estado
+            : pedido.estado?.nombre ?? pedido.estadoNombre ?? "";
+        const estadoKey = estadoBase?.toLowerCase?.() ?? "";
         const uiOrder = transform(pedido);
-        if (pedido.estado === "entregado" || pedido.estado === "cancelado") {
+        if (estadoKey === "entregado" || estadoKey === "cancelado") {
           acc.past.push(uiOrder);
         } else {
           acc.current.push(uiOrder);

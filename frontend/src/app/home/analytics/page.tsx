@@ -1,12 +1,14 @@
 "use client";
 
-import {useEffect, useMemo, useState} from "react";
+import {useCallback, useEffect, useMemo, useState} from "react";
 import {useRouter} from "next/navigation";
 import {
   getPedidos,
   getResultadosEncuestas,
+  getSedes,
   type EncuestaMenuResultado,
   type PedidoResponse,
+  type SedeItem,
 } from "@/lib/api";
 
 function LoadingView() {
@@ -62,6 +64,7 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null);
   const [resultados, setResultados] = useState<EncuestaMenuResultado[]>([]);
   const [pedidos, setPedidos] = useState<PedidoResponse[]>([]);
+  const [sedeLookup, setSedeLookup] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const stored =
@@ -95,12 +98,22 @@ export default function AnalyticsPage() {
       setLoading(true);
       setError(null);
       try {
-        const [encuestas, pedidosResponse] = await Promise.all([
-          getResultadosEncuestas(),
-          getPedidos(),
-        ]);
+        const [encuestas, pedidosResponse, sedesResponse] =
+          await Promise.all([
+            getResultadosEncuestas(),
+            getPedidos(),
+            getSedes(),
+          ]);
         setResultados(encuestas);
         setPedidos(pedidosResponse);
+        const lookup: Record<string, string> = {};
+        sedesResponse.forEach((sede: SedeItem) => {
+          const key = sede?._id?.toString().trim();
+          if (key) {
+            lookup[key] = sede.nombre?.trim() || sede._id;
+          }
+        });
+        setSedeLookup(lookup);
       } catch (err) {
         console.error("Error al cargar analíticas:", err);
         setError(
@@ -167,20 +180,32 @@ export default function AnalyticsPage() {
     const categoryRevenue = new Map<string, Map<string, number>>();
 
     pedidosHoy.forEach((pedido) => {
-      const sedeKey = pedido.sede ?? "Sin sede";
+      const sedeLabel =
+        pedido.sedeNombre ??
+        (typeof pedido.sede === "object"
+          ? pedido.sede?.nombre ?? pedido.sede?._id ?? null
+          : pedido.sede ?? null);
+      const sedeKey =
+        typeof sedeLabel === "string" && sedeLabel.trim()
+          ? sedeLabel.trim()
+          : "Sin sede";
       const pedidoTotal = Number(pedido.total) || 0;
       sedeTotals.set(sedeKey, (sedeTotals.get(sedeKey) ?? 0) + pedidoTotal);
 
       const baseDisplayName =
-        pedido.usuarioNombre ??
-        pedido.usuarioCorreo ??
-        pedido.usuarioId ??
-        "Usuario no identificado";
+        pedido.usuarioNombre?.trim() ||
+        pedido.usuarioCodigo?.trim() ||
+        pedido.usuarioDocumento?.trim() ||
+        pedido.usuarioCorreo?.trim() ||
+        (typeof pedido.usuarioId === "string"
+          ? pedido.usuarioId.trim()
+          : "");
       const displayName =
-        typeof baseDisplayName === "string"
-          ? baseDisplayName.trim() || "Usuario no identificado"
+        baseDisplayName && baseDisplayName.length
+          ? baseDisplayName
           : "Usuario no identificado";
-      const userKey = pedido.usuarioId ?? displayName;
+      const userKey =
+        (typeof pedido.usuarioId === "string" && pedido.usuarioId.trim()) || displayName;
       const existingUser = userTotals.get(userKey);
       if (existingUser) {
         existingUser.total += pedidoTotal;
@@ -188,7 +213,7 @@ export default function AnalyticsPage() {
         userTotals.set(userKey, {displayName, total: pedidoTotal});
       }
 
-      pedido.items.forEach((item) => {
+      pedido.items?.forEach((item) => {
         const quantity = Math.max(0, Number(item.cantidad) || 0);
         const unitPrice = Number(item.precioUnitario) || 0;
         const revenue = quantity * unitPrice;
@@ -214,7 +239,11 @@ export default function AnalyticsPage() {
           });
         }
 
-        const categoryKey = item.tipo ? String(item.tipo) : "Sin categoría";
+        const categoryBase =
+          (typeof item.categoria === "string" && item.categoria.trim()) ||
+          (typeof item.tipo === "string" && item.tipo.trim()) ||
+          "Sin categoría";
+        const categoryKey = categoryBase;
         let sedeCategories = categoryRevenue.get(sedeKey);
         if (!sedeCategories) {
           sedeCategories = new Map<string, number>();
@@ -272,6 +301,32 @@ export default function AnalyticsPage() {
       ranking,
     };
   }, [pedidosHoy]);
+
+  const resolveSedeName = useCallback(
+    (sede: EncuestaMenuResultado["sede"]) => {
+      if (!sede) return "Sede sin nombre";
+      if (typeof sede === "string") {
+        const trimmed = sede.trim();
+        if (trimmed && sedeLookup[trimmed]) {
+          return sedeLookup[trimmed];
+        }
+        return trimmed || "Sede sin nombre";
+      }
+
+      const id = sede._id ? sede._id.toString().trim() : "";
+      if (id && sedeLookup[id]) {
+        return sedeLookup[id];
+      }
+
+      const nombre = sede.nombre ? sede.nombre.toString().trim() : "";
+      if (nombre) {
+        return nombre;
+      }
+
+      return id || "Sede sin nombre";
+    },
+    [sedeLookup]
+  );
 
   if (checkingAuth) {
     return <LoadingView />;
@@ -442,73 +497,116 @@ export default function AnalyticsPage() {
             Aún no hay encuestas registradas.
           </div>
         ) : (
-          <div className="space-y-6">
-            {resultados.map((resultado) => (
-              <section
-                key={resultado.menuId}
-                className="rounded-xl border border-border bg-white p-6 shadow-sm"
-              >
-                <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
-                  <div>
-                    <h2 className="text-xl font-semibold text-foreground">
-                      {resultado.sede}
-                    </h2>
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {resultados.map((resultado) => {
+              const sedeNombre = resolveSedeName(resultado.sede);
+              const totalRespuestas = Math.max(
+                0,
+                resultado.totalEncuestas ?? 0
+              );
+              const totalVotos = Math.max(
+                0,
+                resultado.totalVotos ??
+                  resultado.opciones.reduce(
+                    (acc, opcion) => acc + (opcion.votos ?? 0),
+                    0
+                  )
+              );
+              const sortedOpciones = [...resultado.opciones].sort(
+                (a, b) => b.votos - a.votos
+              );
+
+              return (
+                <article
+                  key={resultado.menuId}
+                  className="flex h-full flex-col rounded-2xl border border-border bg-white p-6 shadow-sm"
+                >
+                  <header className="mb-4 flex flex-col gap-1">
+                    <span className="text-xs uppercase tracking-wide text-foreground-secondary">
+                      {formatDate(resultado.fecha)}
+                    </span>
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {sedeNombre}
+                    </h3>
                     <p className="text-sm text-foreground-secondary">
-                      {formatDate(resultado.fecha)} · {resultado.totalEncuestas}{" "}
-                      respuesta
-                      {resultado.totalEncuestas === 1 ? "" : "s"}
+                      {totalRespuestas} respuesta
+                      {totalRespuestas === 1 ? "" : "s"}
+                      {totalVotos > 0 && totalVotos !== totalRespuestas && (
+                        <span className="ml-1 text-xs text-foreground-secondary/80">
+                          · {totalVotos} voto{totalVotos === 1 ? "" : "s"}
+                        </span>
+                      )}
                     </p>
-                  </div>
-                </header>
-                <div className="space-y-2">
-                  {resultado.opciones.length === 0 ? (
-                    <p className="text-sm text-foreground-secondary">
+                  </header>
+
+                  {sortedOpciones.length === 0 ? (
+                    <div className="mt-auto rounded-lg border border-dashed border-border/50 bg-muted/30 p-4 text-sm text-foreground-secondary">
                       Este menú aún no tiene votos registrados.
-                    </p>
+                    </div>
                   ) : (
-                    resultado.opciones.map((opcion) => {
-                      const porcentaje = resultado.totalEncuestas
-                        ? Math.round(
-                            (opcion.votos / resultado.totalEncuestas) * 100
-                          )
-                        : 0;
-                      return (
-                        <div
-                          key={opcion.opcionId}
-                          className="rounded-lg border border-border/60 bg-muted/30 p-4"
-                        >
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <p className="font-medium text-foreground">
-                                {opcion.nombre}
-                              </p>
-                              {opcion.tipo && (
-                                <p className="text-xs uppercase text-foreground-secondary">
-                                  {opcion.tipo}
-                                </p>
-                              )}
-                            </div>
-                            <div className="text-right text-sm text-foreground-secondary">
-                              <p className="font-semibold text-foreground">
-                                {opcion.votos} voto
-                                {opcion.votos === 1 ? "" : "s"}
-                              </p>
-                              <p>{porcentaje}%</p>
-                            </div>
-                          </div>
-                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-border/60">
+                    <div className="flex flex-1 flex-col gap-4">
+                      <div className="space-y-3">
+                        {sortedOpciones.map((opcion, index) => {
+                          const divisor = totalVotos || totalRespuestas || 1;
+                          const porcentaje = divisor
+                            ? Math.round(
+                                (opcion.votos / divisor) * 100
+                              )
+                            : 0;
+
+                          return (
                             <div
-                              className="h-full rounded-full bg-primary"
-                              style={{width: `${Math.min(porcentaje, 100)}%`}}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    })
+                              key={opcion.opcionId}
+                              className="rounded-xl border border-border/40 bg-muted/20 p-3"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex items-start gap-3">
+                                  <span className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-xs font-semibold text-foreground-secondary shadow-sm">
+                                    {index + 1}
+                                  </span>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-medium text-foreground">
+                                        {opcion.nombre}
+                                      </p>
+                                      {index === 0 && (
+                                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                                          Favorito
+                                        </span>
+                                      )}
+                                    </div>
+                                    {opcion.tipo && (
+                                      <p className="text-xs uppercase tracking-wide text-foreground-secondary">
+                                        {opcion.tipo}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right text-xs text-foreground-secondary">
+                                  <p className="font-semibold text-foreground">
+                                    {porcentaje}%
+                                  </p>
+                                  <p>
+                                    {opcion.votos} voto
+                                    {opcion.votos === 1 ? "" : "s"}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="mt-3 h-2 overflow-hidden rounded-full bg-border/40">
+                                <div
+                                  className="h-full rounded-full bg-primary transition-all duration-500"
+                                  style={{width: `${Math.min(porcentaje, 100)}%`}}
+                                ></div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
-                </div>
-              </section>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

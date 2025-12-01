@@ -68,6 +68,15 @@ export default function ProductsPage() {
   );
   const [sedes, setSedes] = useState<SedeItem[]>([]);
 
+  const resolveSedeNombre = useCallback((rawSede: PlatoMenuItem["sede"]) => {
+    if (!rawSede) return "";
+    if (typeof rawSede === "string") return rawSede;
+    if (typeof rawSede === "object") {
+      return rawSede?.nombre ?? rawSede?._id ?? "";
+    }
+    return "";
+  }, []);
+
   useEffect(() => {
     const stored =
       typeof window !== "undefined" ? localStorage.getItem("user") : null;
@@ -127,10 +136,13 @@ export default function ProductsPage() {
   }, [authorized, loadPlatos, loadSedes]);
 
   // Sedes disponibles para selección
-  const sedeOptions = useMemo(
-    () => sedes.map((s) => s.nombre),
-    [sedes]
-  );
+  const sedeOptions = useMemo(() => {
+    const unique = new Set<string>();
+    sedes.forEach((sede) => {
+      if (sede?.nombre) unique.add(sede.nombre);
+    });
+    return Array.from(unique).sort((a, b) => a.localeCompare(b));
+  }, [sedes]);
 
   const categoryOptions = useMemo(() => {
     const categorias = new Set<string>(BASE_CATEGORIES);
@@ -146,7 +158,8 @@ export default function ProductsPage() {
     const term = searchTerm.trim().toLowerCase();
     return platos
       .filter((plato) => {
-        if (selectedSede !== "Todas" && plato.sede !== selectedSede) {
+        const sedeNombre = resolveSedeNombre(plato.sede);
+        if (selectedSede !== "Todas" && sedeNombre !== selectedSede) {
           return false;
         }
         if (selectedCategory !== "Todos" && plato.tipo !== selectedCategory) {
@@ -154,12 +167,12 @@ export default function ProductsPage() {
         }
         if (!term) return true;
         const haystack = `${plato.nombre} ${plato.descripcion ?? ""} ${
-          plato.sede ?? ""
+          sedeNombre
         } ${plato.tipo}`.toLowerCase();
         return haystack.includes(term);
       })
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [platos, searchTerm, selectedSede, selectedCategory]);
+  }, [platos, searchTerm, selectedSede, selectedCategory, resolveSedeNombre]);
 
   const handleFormInput = (
     field: keyof CrearProductoPayload,
@@ -329,6 +342,7 @@ export default function ProductsPage() {
             {filteredPlatos.map((plato) => {
               const key = plato._id ?? plato.nombre;
               const imageSrc = plato.imagenUrl ?? "";
+              const sedeNombre = resolveSedeNombre(plato.sede);
               return (
                 <article
                   key={key}
@@ -351,7 +365,7 @@ export default function ProductsPage() {
                           {plato.nombre}
                         </h3>
                         <p className="text-xs uppercase text-foreground-secondary">
-                          {plato.sede ?? "General"}
+                          {sedeNombre || "General"}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">

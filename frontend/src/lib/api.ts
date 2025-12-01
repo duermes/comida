@@ -132,7 +132,14 @@ export interface PopulatedMenu {
   _id?: string;
   id?: string;
   fecha: string;
-  sede: string;
+  sede:
+    | string
+    | {
+        _id?: string;
+        nombre?: string | null;
+        direccion?: string | null;
+      }
+    | null;
   sedeNombre?: string | null;
   precioNormal: number;
   precioEjecutivo: number;
@@ -152,22 +159,31 @@ export interface PopulatedMenu {
 
 export interface PedidoResponse {
   _id: string;
-  usuarioId: string;
-  usuarioNombre?: string;
-  usuarioCorreo?: string;
-  sede: string | {_id?: string; nombre?: string; direccion?: string};
+  usuarioId: string | null;
+  usuarioNombre?: string | null;
+  usuarioCodigo?: string | null;
+  usuarioDocumento?: string | null;
+  usuarioCorreo?: string | null;
+  sede: string | {_id?: string | null; nombre?: string | null; direccion?: string | null} | null;
+  sedeNombre?: string | null;
   items: Array<{
     refId: string;
     tipo: string;
     cantidad: number;
     precioUnitario: number;
-    nombre?: string;
-    imagenUrl?: string;
+    nombre?: string | null;
+    imagenUrl?: string | null;
+    categoria?: string | null;
   }>;
   total: number;
-  estado: string | {_id?: string; nombre?: string};
-  metodoPago: string | {_id?: string; nombre?: string};
+  estado: string | {_id?: string; nombre?: string | null} | null;
+  estadoNombre?: string | null;
+  estadoId?: string | null;
+  metodoPago: string | {_id?: string | null; nombre?: string | null} | null;
+  metodoPagoNombre?: string | null;
+  metodoPagoId?: string | null;
   creadoEn: string;
+  actualizadoEn?: string | null;
 }
 
 export interface FavoritoMenu {
@@ -195,9 +211,16 @@ export interface PlatoMenuItem {
   _id: string;
   nombre: string;
   descripcion?: string;
-  tipo: "plato" | "bebida" | "postre" | "piqueo" | "entrada";
-  imagenUrl?: string;
-  sede?: string;
+  tipo: "entrada" | "segundo" | "postre" | "bebida" | "piqueo" | string;
+  imagenUrl?: string | null;
+  sede?:
+    | string
+    | {
+        _id?: string;
+        nombre?: string;
+        direccion?: string;
+      }
+    | null;
   stock: number;
   activo: boolean;
 }
@@ -205,12 +228,22 @@ export interface PlatoMenuItem {
 export interface UsuarioItem {
   _id: string;
   nombre: string;
-  rol: string;
+  rol: string | {_id?: string; nombre?: string};
   tipo: string;
-  codigoUsu?: string;
-  dni?: string;
-  sede?: string;
-  correo?: string;
+  codigoUsu?: string | null;
+  dni?:
+    | string
+    | {
+        _id?: string;
+        numero?: string;
+        nombres?: string;
+        apellidos?: string;
+        createdAt?: string;
+        updatedAt?: string;
+      }
+    | null;
+  sede?: string | {_id?: string; nombre?: string} | null;
+  correo?: string | null;
   activo: boolean;
 }
 
@@ -230,8 +263,16 @@ export interface EncuestaOpcionResultado {
 export interface EncuestaMenuResultado {
   menuId: string;
   fecha: string;
-  sede: string;
+  sede:
+    | string
+    | {
+        _id?: string;
+        nombre?: string | null;
+        direccion?: string | null;
+      }
+    | null;
   totalEncuestas: number;
+  totalVotos?: number;
   opciones: EncuestaOpcionResultado[];
 }
 
@@ -366,35 +407,73 @@ export async function getUsuarios(params: {activo?: boolean} = {}) {
 }
 
 export interface CrearUsuarioPayload {
-  nombre: string;
+  nombres: string;
+  apellidos: string;
   password: string;
   tipo: string;
   codigoUsu: string;
-  dni: string;
+  numero: string;
   rol: string;
+  sede?: string;
+}
+
+export interface CrearUsuarioResponse {
+  id: string;
+  dni: string;
+  nombres: string;
+  apellidos: string;
+  rol: string;
+  tipo: string;
+  sede: string | null;
+  codigoUsu?: string | null;
+  token?: string | null;
 }
 
 export async function crearUsuario(payload: CrearUsuarioPayload) {
   const codigo = payload.codigoUsu.trim().toLowerCase();
-  const dni = payload.dni.trim().toLowerCase();
-  const nombre = payload.nombre.trim();
+  const numero = payload.numero.trim().toLowerCase();
+  const nombres = payload.nombres.trim();
+  const apellidos = payload.apellidos.trim();
   const password = payload.password.trim();
-  const identificador = codigo || dni;
+  const tipo = payload.tipo.trim();
+  const rol = payload.rol.trim();
+  const sede = payload.sede?.trim() ?? "";
+  const identificador = codigo || numero;
 
-  if (!identificador) {
-    throw new Error("Debes proporcionar un identificador para el usuario.");
+  if (!nombres || !apellidos) {
+    throw new Error("Ingresa nombres y apellidos para el usuario.");
   }
 
-  const bodyPayload: CrearUsuarioPayload & {identificador: string} = {
-    ...payload,
-    nombre,
+  if (!password) {
+    throw new Error("La contraseña es obligatoria.");
+  }
+
+  if (!rol || !tipo) {
+    throw new Error("Selecciona el rol y tipo de usuario.");
+  }
+
+  if (!identificador) {
+    throw new Error("Debes proporcionar al menos un código o número de documento.");
+  }
+
+  const bodyPayload: Record<string, string> = {
     password,
-    codigoUsu: codigo,
-    dni,
-    identificador,
+    tipo,
+    rol,
+    numero,
+    nombres,
+    apellidos,
   };
 
-  return request<UsuarioItem>("/api/auth/register", {
+  if (codigo) {
+    bodyPayload.codigoUsu = codigo;
+  }
+
+  if (sede) {
+    bodyPayload.sede = sede;
+  }
+
+  return request<CrearUsuarioResponse>("/api/auth/register", {
     method: "POST",
     body: JSON.stringify(bodyPayload),
   });
