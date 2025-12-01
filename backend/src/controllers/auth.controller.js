@@ -26,6 +26,24 @@ export const register = async (req, reply) => {
   const codigoUsuNormalizado = codigoUsu?.trim().toLowerCase();
   const dniNormalizado = dni?.trim().toLowerCase();
 
+  let actor = req.user ?? null;
+  if (!actor) {
+    const bearerHeader = req.headers?.authorization;
+    const bearerToken = typeof bearerHeader === "string" && bearerHeader.startsWith("Bearer ")
+      ? bearerHeader.slice(7).trim()
+      : undefined;
+    const rawToken = bearerToken || req.cookies?.token;
+    if (rawToken) {
+      try {
+        const decoded = await verifyJwt(rawToken);
+        actor = decoded;
+      } catch (err) {
+        // Ignoramos tokens inválidos para no bloquear registro público
+        actor = null;
+      }
+    }
+  }
+
   try {
 // 1. Validar duplicados (dni o codigoUsu)
     const duplicateFilters = [codigoUsuNormalizado ? { codigoUsu: codigoUsuNormalizado } : null].filter(Boolean);
@@ -52,18 +70,32 @@ export const register = async (req, reply) => {
     let roleToAssign = null;
 
     // Caso 1: Si no hay token → solo puede crear usuarios con rol "usuario"
-    if (!req.user) {
+    if (!actor) {
       roleToAssign = await Rol.findOne({ nombre: "usuario" });
     } else {
       // Usuario autenticado
-      const currentUser = await Usuario.findById(req.user.id).populate("rol");
-      const currentRole = currentUser.rol.nombre;
+      if (!actor.id) {
+        return reply.status(401).send({ message: "Token inválido. Inicia sesión nuevamente." });
+      }
+
+      const currentUser = await Usuario.findById(actor.id).populate("rol");
+      if (!currentUser) {
+        return reply.status(401).send({ message: "Usuario autenticado no encontrado" });
+      }
+
+      const currentRole = currentUser?.rol?.nombre;
+      if (!currentRole) {
+        return reply.status(400).send({ message: "No se pudo determinar el rol del usuario autenticado" });
+      }
 
       if (!rol) {
         // Si no indica rol, asignar usuario
         roleToAssign = await Rol.findOne({ nombre: "usuario" });
       } else {
-        const requestedRole = await Rol.findById(rol);
+        let requestedRole = await Rol.findById(rol);
+        if (!requestedRole) {
+          requestedRole = await Rol.findOne({ nombre: rol });
+        }
         if (!requestedRole)
           return reply.status(400).send({ message: "El rol enviado no existe." });
 
@@ -118,7 +150,7 @@ export const register = async (req, reply) => {
 
     // 7. Token si no estaba logueado
     let token = null;
-    if (!req.user) {
+    if (!actor) {
       token = await createAccessToken({
         id: newUser._id,
         rol: roleToAssign.nombre,

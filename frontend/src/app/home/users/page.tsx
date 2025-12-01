@@ -11,8 +11,10 @@ import {
 import {useRouter} from "next/navigation";
 import {
   crearUsuario,
+  getRoles,
   getUsuarios,
   type CrearUsuarioPayload,
+  type RolItem,
   type UsuarioItem,
 } from "@/lib/api";
 import {Button} from "@/components/ui/button";
@@ -43,6 +45,8 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [usuarios, setUsuarios] = useState<UsuarioItem[]>([]);
+  const [roles, setRoles] = useState<RolItem[]>([]);
+  const [rolesError, setRolesError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -94,16 +98,50 @@ export default function UsersPage() {
     }
   }, [authorized]);
 
+  const loadRoles = useCallback(async () => {
+    if (!authorized) return;
+    setRolesError(null);
+    try {
+      const response = await getRoles();
+      setRoles(response);
+    } catch (err) {
+      console.error("Error al obtener roles:", err);
+      setRolesError("No se pudieron cargar los roles disponibles");
+    }
+  }, [authorized]);
+
   useEffect(() => {
     if (!authorized) return;
     loadUsuarios();
-  }, [authorized, loadUsuarios]);
+    loadRoles();
+  }, [authorized, loadUsuarios, loadRoles]);
 
-  const getRolNombre = useCallback((usuario: UsuarioItem) => {
-    if (!usuario.rol) return "";
-    if (typeof usuario.rol === "string") return usuario.rol;
-    return usuario.rol?.nombre ?? "";
-  }, []);
+  useEffect(() => {
+    if (roles.length === 0) return;
+    setFormState((prev) => {
+      if (prev.rol) return prev;
+      return {...prev, rol: roles[0]._id};
+    });
+  }, [roles]);
+
+  const rolesById = useMemo(() => {
+    return new Map(roles.map((role) => [role._id, role.nombre]));
+  }, [roles]);
+
+  const getRolNombre = useCallback(
+    (usuario: UsuarioItem) => {
+      if (!usuario.rol) return "";
+      if (typeof usuario.rol === "string") {
+        return rolesById.get(usuario.rol) ?? usuario.rol;
+      }
+      const populatedId = usuario.rol._id;
+      if (populatedId) {
+        return rolesById.get(populatedId) ?? usuario.rol.nombre ?? "";
+      }
+      return usuario.rol.nombre ?? "";
+    },
+    [rolesById]
+  );
 
   const getDniNumero = useCallback((usuario: UsuarioItem) => {
     if (!usuario.dni) return "";
@@ -133,6 +171,12 @@ export default function UsersPage() {
   }, [usuarios, searchTerm, getDniNumero, getRolNombre]);
 
   const roleOptions = useMemo(() => {
+    if (roles.length > 0) {
+      return roles
+        .map((role) => ({ value: role._id, label: role.nombre }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    }
+
     const rolesMap = new Map<string, string>();
     usuarios.forEach((usuario) => {
       if (!usuario.rol) return;
@@ -147,7 +191,7 @@ export default function UsersPage() {
     return Array.from(rolesMap.entries())
       .map(([value, label]) => ({value, label}))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [usuarios]);
+  }, [roles, usuarios]);
 
   const typeOptions = useMemo(() => {
     // Backend expects 'interno' or 'externo'
@@ -225,7 +269,11 @@ export default function UsersPage() {
   const openAddModal = () => {
     setFormError(null);
     setShowAddModal(true);
-    setFormState(createEmptyUserForm());
+    const emptyForm = createEmptyUserForm();
+    if (!emptyForm.rol && roles.length > 0) {
+      emptyForm.rol = roles[0]._id;
+    }
+    setFormState(emptyForm);
   };
 
   const closeAddModal = () => {
@@ -279,6 +327,12 @@ export default function UsersPage() {
         {error && (
           <div className="rounded-lg border border-error/20 bg-error/10 px-4 py-3 text-error">
             {error}
+          </div>
+        )}
+
+        {rolesError && (
+          <div className="rounded-lg border border-warning/20 bg-warning/10 px-4 py-3 text-warning">
+            {rolesError}
           </div>
         )}
 
@@ -406,6 +460,7 @@ export default function UsersPage() {
                     Rol
                   </label>
                   <Select
+                    disabled={roleOptions.length === 0}
                     value={formState.rol}
                     onValueChange={(value) => handleFormInput("rol", value)}
                   >
@@ -420,6 +475,9 @@ export default function UsersPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {rolesError && (
+                    <p className="text-xs text-warning">No se pudo actualizar el listado de roles. Intenta recargar.</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">

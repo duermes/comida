@@ -467,11 +467,13 @@ export default function ProductsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">Seleccionar</SelectItem>
-                      {sedeOptions.map((sede) => (
-                        <SelectItem key={sede} value={sede}>
-                          {sede}
-                        </SelectItem>
-                      ))}
+                      {sedes
+                        .filter((sede) => typeof sede._id === "string" && sede._id.trim().length > 0)
+                        .map((sede) => (
+                          <SelectItem key={sede._id} value={sede._id}>
+                            {sede.nombre ?? "Sede sin nombre"}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>

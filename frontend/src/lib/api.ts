@@ -255,6 +255,12 @@ export interface UsuarioItem {
   activo: boolean;
 }
 
+export interface RolItem {
+  _id: string;
+  nombre: string;
+  descripcion?: string | null;
+}
+
 export interface SedeItem {
   _id: string;
   nombre: string;
@@ -412,6 +418,10 @@ export async function getUsuarios(params: {activo?: boolean} = {}) {
   const qs = query.toString();
   const path = qs ? `/api/usuarios?${qs}` : "/api/usuarios";
   return request<UsuarioItem[]>(path);
+}
+
+export async function getRoles() {
+  return request<RolItem[]>("/api/usuarios/roles");
 }
 
 export interface CrearUsuarioPayload {

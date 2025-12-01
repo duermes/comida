@@ -249,6 +249,35 @@ class UsuarioController {
     }
   }
 
+  static async listarRoles(req, reply) {
+    try {
+      const usuarioLogueado = req.user;
+      if (!usuarioLogueado || !usuarioLogueado.id) {
+        return reply.code(401).send({ error: "No autenticado" });
+      }
+
+      const usuarioDb = await Usuario.findById(usuarioLogueado.id).populate("rol");
+      if (!usuarioDb || !usuarioDb.rol) {
+        return reply.code(401).send({ error: "Usuario autenticado no encontrado" });
+      }
+
+      const rolNombre = usuarioDb.rol.nombre ?? usuarioLogueado.rol;
+      if (rolNombre !== ROLES.ADMIN) {
+        return reply.code(403).send({ error: "Solo un administrador puede consultar los roles" });
+      }
+
+      const roles = await Rol.find({ activo: true })
+        .select("_id nombre descripcion")
+        .sort({ nombre: 1 })
+        .lean();
+
+      return reply.send(roles);
+    } catch (error) {
+      console.error("Error al listar roles:", error);
+      return reply.code(500).send({ error: "Error al listar roles", detalle: error.message });
+    }
+  }
+
   static async mfaSetup(req, reply) {}
   static async mfaConfirm(req, reply) {}
 }

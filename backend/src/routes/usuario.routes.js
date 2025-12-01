@@ -33,6 +33,11 @@ export default async function usuarioRoutes(fastify) {
     UsuarioController.toggleFavorito
   );
   fastify.get(
+    "/roles",
+    {preHandler: [verifyToken]},
+    UsuarioController.listarRoles
+  );
+  fastify.get(
     "/mfa/setup",
     {preHandler: [verifyToken]},
     UsuarioController.mfaSetup
