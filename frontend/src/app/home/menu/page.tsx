@@ -250,25 +250,102 @@ export default function MenuPage() {
       });
   }, [menus, favorites, selectedCategory, selectedSede, searchTerm]);
 
+  const totalMenusActivos = useMemo(
+    () => menus.filter((menu) => menu.activo).length,
+    [menus]
+  );
+
+  const filterChips = useMemo(() => {
+    const chips: Array<{label: string; value: string}> = [];
+
+    if (selectedSede !== "Todas") {
+      chips.push({label: "Sede", value: selectedSede});
+    }
+
+    if (selectedDate) {
+      const parsed = new Date(selectedDate);
+      const formatted = Number.isNaN(parsed.getTime())
+        ? selectedDate
+        : parsed.toLocaleDateString();
+      chips.push({label: "Fecha", value: formatted});
+    }
+
+    const trimmedSearch = searchTerm.trim();
+    if (trimmedSearch.length) {
+      chips.push({label: "Búsqueda", value: `"${trimmedSearch}"`});
+    }
+
+    if (selectedCategory === "todos") {
+      chips.push({label: "Tipo", value: "Todos"});
+    } else if (selectedCategory !== CATEGORY_OPTIONS[0].value) {
+      const selectedOption =
+        CATEGORY_OPTIONS.find((option) => option.value === selectedCategory)?.label ??
+        selectedCategory;
+      chips.push({label: "Tipo", value: selectedOption});
+    }
+
+    return chips;
+  }, [selectedSede, selectedDate, searchTerm, selectedCategory]);
+
+  const displayedMenus = items.length;
+  const favoritosGuardados = favorites.size;
+
   return (
     <div className="flex h-full">
       <div className="flex-1 overflow-auto p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-12 bg-linear-to-r from-warning to-accent-green rounded-2xl p-8 text-white">
-            <h2 className="text-3xl font-bold mb-2">Oferta del Día</h2>
-            <p className="text-sm opacity-90 mb-4">
-              No te pierdas de nuestras increíbles ofertas especiales
-            </p>
-            <div className="flex items-center space-x-8">
-              <div className="text-4xl font-bold">05:00:00</div>
-              <button className="bg-white text-warning font-semibold px-6 py-2 rounded-lg hover:bg-opacity-90 transition-smooth">
-                Pedir ahora
-              </button>
+        <div className="max-w-7xl mx-auto space-y-8">
+          <section className="rounded-3xl border border-border bg-gradient-to-br from-primary/5 via-white to-transparent px-8 py-8 shadow-sm">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-2 max-w-2xl">
+                <h2 className="text-3xl font-semibold text-foreground">
+                  Explora el menú del día
+                </h2>
+                <p className="text-sm text-foreground-secondary">
+                  Personaliza la vista por sede, fecha y tipo de menú para encontrar tu mejor opción.
+                </p>
+              </div>
+              <div className="grid w-full max-w-xl grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="rounded-2xl border border-border bg-white/60 px-5 py-4 backdrop-blur">
+                  <p className="text-xs uppercase tracking-wide text-foreground-secondary">
+                    Menús publicados
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold text-primary">{totalMenusActivos}</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-white/60 px-5 py-4 backdrop-blur">
+                  <p className="text-xs uppercase tracking-wide text-foreground-secondary">
+                    Resultados actuales
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold text-primary">{displayedMenus}</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-white/60 px-5 py-4 backdrop-blur">
+                  <p className="text-xs uppercase tracking-wide text-foreground-secondary">
+                    Favoritos guardados
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold text-primary">{favoritosGuardados}</p>
+                </div>
+              </div>
             </div>
-          </div>
+            {filterChips.length > 0 ? (
+              <div className="mt-6 flex flex-wrap gap-3">
+                {filterChips.map((chip) => (
+                  <span
+                    key={`${chip.label}-${chip.value}`}
+                    className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm text-primary"
+                  >
+                    <span className="font-medium">{chip.label}:</span>
+                    <span>{chip.value}</span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-6 text-sm text-foreground-secondary">
+                Usa los filtros para refinar tu búsqueda o descubre todas las opciones disponibles.
+              </p>
+            )}
+          </section>
 
           {error && (
-            <div className="mb-6 rounded-lg border border-error/20 bg-error/10 px-4 py-3 text-error">
+            <div className="rounded-lg border border-error/20 bg-error/10 px-4 py-3 text-error">
               {error}
             </div>
           )}

@@ -1,8 +1,7 @@
 "use client";
 
 import {useRouter} from "next/navigation";
-import {Bell, LogOut, Search} from "lucide-react";
-import {Input} from "@/components/ui/input";
+import {Bell, LogOut} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {logout} from "@/lib/api";
 
@@ -39,17 +38,9 @@ export default function Header({user}: HeaderProps) {
     <header className="bg-white border-b border-border px-8 py-4 flex items-center justify-between">
       <div className="flex items-center space-x-4">
         <h1 className="text-2xl font-bold text-primary">UTP+FOOD</h1>
-        <div className="relative">
-          <Search
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground-secondary"
-            size={18}
-          />
-          <Input
-            type="text"
-            placeholder="Buscar platos o comedores"
-            className="pl-10 w-96"
-          />
-        </div>
+        <p className="hidden sm:block text-sm text-foreground-secondary">
+          Tu guía diaria de menús universitarios
+        </p>
       </div>
 
       <div className="flex items-center space-x-6">
