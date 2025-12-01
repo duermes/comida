@@ -19,7 +19,15 @@ export default function OrderCard({ order, isPast = false }: OrderCardProps) {
       <div className="flex gap-6 p-6">
         {/* Image */}
         <div className="w-48 h-32 rounded-lg overflow-hidden flex-shrink-0">
-          <img src={order.image || "/placeholder.svg"} alt={order.dish} className="w-full h-full object-cover" />
+          <img
+            src={
+              typeof order.image === "string" && order.image.trim().length > 0
+                ? order.image
+                : "/file.svg"
+            }
+            alt={order.dish}
+            className="w-full h-full object-cover"
+          />
         </div>
 
         {/* Content */}

@@ -1,5 +1,6 @@
 "use client";
 
+import {useEffect} from "react";
 import DishCard from "@/components/menu/dish-card";
 import type {PopulatedMenu} from "@/lib/api";
 
@@ -29,6 +30,18 @@ export default function MenuGrid({
   onSelectDish,
   onToggleFavorite,
 }: MenuGridProps) {
+  useEffect(() => {
+    if (!items.length) return;
+    const debugRows = items.map((item) => ({
+      id: item.id,
+      menuId: item.menuId,
+      variant: item.variant,
+      sede: item.sede,
+      image: item.image ?? "(sin imagen)",
+    }));
+    console.table(debugRows);
+  }, [items]);
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -155,7 +155,15 @@ class UsuarioController {
       const cartaIds = favoritos.filter(f => f.tipo === "carta").map(f => f.refId);
 
       const [menus, platosCarta] = await Promise.all([
-        menuIds.length ? Menu.find({ _id: { $in: menuIds } }).lean() : [],
+        menuIds.length
+          ? Menu.find({ _id: { $in: menuIds } })
+              .populate({
+                path: "normal.entrada normal.segundo normal.bebida ejecutivo.entradas ejecutivo.segundos ejecutivo.postres ejecutivo.bebidas",
+                select: "nombre tipo stock activo descripcion imagenUrl",
+              })
+              .populate("sede", "nombre direccion")
+              .lean()
+          : [],
         cartaIds.length ? PlatoCarta.find({ _id: { $in: cartaIds } }).lean() : [],
       ]);
 
@@ -166,7 +174,36 @@ class UsuarioController {
         .map(fav => {
           if (!fav || !fav.refId) return null;
           const key = fav.refId.toString();
-          if (fav.tipo === "menu") return menuMap.get(key) ? { tipo: "menu", refId: key, menu: menuMap.get(key) } : null;
+          if (fav.tipo === "menu") {
+            const menu = menuMap.get(key);
+            if (!menu) return null;
+
+            const sedeNombre =
+              menu.sede && typeof menu.sede === "object" && "nombre" in menu.sede
+                ? menu.sede.nombre
+                : null;
+
+            const imageCandidates = [
+              menu?.normal?.segundo?.imagenUrl,
+              menu?.normal?.entrada?.imagenUrl,
+              menu?.ejecutivo?.segundos?.[0]?.imagenUrl,
+              menu?.ejecutivo?.entradas?.[0]?.imagenUrl,
+            ];
+
+            const resolvedImage = imageCandidates.find(
+              candidate => typeof candidate === "string" && candidate.trim().length > 0
+            );
+
+            return {
+              tipo: "menu",
+              refId: key,
+              imagenUrl: resolvedImage ?? null,
+              menu: {
+                ...menu,
+                sedeNombre,
+              },
+            };
+          }
           if (fav.tipo === "carta") return cartaMap.get(key) ? { tipo: "carta", refId: key, plato: cartaMap.get(key) } : null;
           return null;
         })

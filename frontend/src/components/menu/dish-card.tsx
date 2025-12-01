@@ -17,7 +17,10 @@ export default function DishCard({
   onToggleFavorite,
   onSelect,
 }: DishCardProps) {
-  const imageSource = dish.image || "/placeholder.svg";
+  const imageSource =
+    (typeof dish.image === "string" && dish.image.trim().length > 0
+      ? dish.image
+      : "/file.svg");
 
   return (
     <div className="bg-white rounded-lg shadow-card overflow-hidden hover:shadow-lg transition-smooth">

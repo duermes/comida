@@ -1,6 +1,6 @@
 "use client";
 
-import {useMemo, useState} from "react";
+import {useCallback, useEffect, useMemo, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
@@ -40,15 +40,77 @@ export default function CreateMenuForm({platos, sedeOptions, onCancel, onCreated
     return "";
   };
 
-  const entradas = useMemo(() => platos.filter((p) => p.tipo === "entrada"), [platos]);
-  const segundos = useMemo(() => platos.filter((p) => p.tipo === "segundo"), [platos]);
-  const postres = useMemo(() => platos.filter((p) => p.tipo === "postre"), [platos]);
-  const bebidas = useMemo(() => platos.filter((p) => p.tipo === "bebida"), [platos]);
+  const filterBySelectedSede = useCallback(
+    (plato: PlatoMenuItem) => {
+      if (!sedeSeleccionada) return false;
+      const sedeNombre = resolveSedeNombre(plato.sede);
+      if (!sedeNombre) return false;
+      return sedeNombre.toLowerCase() === sedeSeleccionada.toLowerCase();
+    },
+    [sedeSeleccionada]
+  );
+
+  const entradas = useMemo(
+    () =>
+      platos.filter(
+        (p) => p.tipo === "entrada" && filterBySelectedSede(p)
+      ),
+    [platos, filterBySelectedSede]
+  );
+  const segundos = useMemo(
+    () =>
+      platos.filter(
+        (p) => p.tipo === "segundo" && filterBySelectedSede(p)
+      ),
+    [platos, filterBySelectedSede]
+  );
+  const postres = useMemo(
+    () =>
+      platos.filter((p) => p.tipo === "postre" && filterBySelectedSede(p)),
+    [platos, filterBySelectedSede]
+  );
+  const bebidas = useMemo(
+    () =>
+      platos.filter((p) => p.tipo === "bebida" && filterBySelectedSede(p)),
+    [platos, filterBySelectedSede]
+  );
 
   const toggleArray = (arr: string[], setArr: (v: string[]) => void, id: string) => {
     if (arr.includes(id)) setArr(arr.filter((x) => x !== id));
     else setArr([...arr, id]);
   };
+
+  useEffect(() => {
+    if (!sedeSeleccionada) {
+      setNormalEntrada("");
+      setNormalSegundo("");
+      setNormalBebida("");
+      setEjEntradas([]);
+      setEjSegundos([]);
+      setEjPostres([]);
+      setEjBebidas([]);
+      return;
+    }
+
+    const ensureSelected = (
+      current: string,
+      options: PlatoMenuItem[],
+      setter: (value: string) => void
+    ) => {
+      if (!current) return;
+      const exists = options.some((opt) => opt._id === current);
+      if (!exists) setter("");
+    };
+
+    ensureSelected(normalEntrada, entradas, setNormalEntrada);
+    ensureSelected(normalSegundo, segundos, setNormalSegundo);
+    ensureSelected(normalBebida, bebidas, setNormalBebida);
+
+    setEjEntradas((prev) => prev.filter((id) => entradas.some((opt) => opt._id === id)));
+    setEjSegundos((prev) => prev.filter((id) => segundos.some((opt) => opt._id === id)));
+    setEjPostres((prev) => prev.filter((id) => postres.some((opt) => opt._id === id)));
+    setEjBebidas((prev) => prev.filter((id) => bebidas.some((opt) => opt._id === id)));
+  }, [sedeSeleccionada, entradas, segundos, postres, bebidas, normalEntrada, normalSegundo, normalBebida]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

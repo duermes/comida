@@ -55,7 +55,13 @@ async function request<T>(
     mergedHeaders.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const fullUrl = `${API_BASE_URL}${path}`;
+  if (typeof window !== "undefined") {
+    // Emit browser-side trace to inspect requested URL and method.
+    console.log("[API request]", options.method ?? "GET", fullUrl);
+  }
+
+  const response = await fetch(fullUrl, {
     ...rest,
     body,
     headers: mergedHeaders,
@@ -190,6 +196,7 @@ export interface FavoritoMenu {
   tipo: "menu";
   refId: string;
   menu: PopulatedMenu;
+  imagenUrl?: string | null;
 }
 
 export interface FavoritoCarta {

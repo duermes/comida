@@ -50,6 +50,31 @@ export default function FavoritesPage() {
       const menu = fav.menu as PopulatedMenu;
       const formattedDate = new Date(menu.fecha).toLocaleDateString();
       const sedeLabel = menu.sedeNombre ?? menu.sede;
+      const resolveImagen = () => {
+        const fromFavorite =
+          typeof fav.imagenUrl === "string" && fav.imagenUrl.trim().length > 0
+            ? fav.imagenUrl.trim()
+            : null;
+
+        if (fromFavorite) return fromFavorite;
+
+        const candidates = [
+          menu.normal.segundo?.imagenUrl,
+          menu.normal.entrada?.imagenUrl,
+          menu.ejecutivo?.segundos?.[0]?.imagenUrl,
+          menu.ejecutivo?.entradas?.[0]?.imagenUrl,
+        ];
+
+        for (const candidate of candidates) {
+          if (typeof candidate === "string" && candidate.trim().length > 0) {
+            return candidate.trim();
+          }
+        }
+
+        return undefined;
+      };
+
+      const image = resolveImagen();
 
       return {
         id: `${menu._id}-favorite`,
@@ -64,7 +89,7 @@ export default function FavoritesPage() {
           .filter(Boolean)
           .join(" • "),
         price: menu.precioNormal,
-        image: menu.normal.segundo?.imagenUrl ?? menu.normal.entrada?.imagenUrl,
+        image,
         sede: sedeLabel,
         isFavorite: true,
         menu,
