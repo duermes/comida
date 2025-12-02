@@ -27,6 +27,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const DEFAULT_ROLE_LABELS: Record<string, string> = {
+  admin: "admin",
+  coordinador: "coordinador",
+  profesor: "profesor",
+  usuario: "usuario",
+};
+
+const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+
+function normalizeRoleLabel(raw?: string | null) {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed || objectIdRegex.test(trimmed)) return null;
+
+  const lower = trimmed.toLowerCase();
+  return DEFAULT_ROLE_LABELS[lower] ?? trimmed;
+}
+
 function LoadingView() {
   return (
     <div className="flex h-full items-center justify-center">
@@ -124,23 +142,108 @@ export default function UsersPage() {
     });
   }, [roles]);
 
-  const rolesById = useMemo(() => {
-    return new Map(roles.map((role) => [role._id, role.nombre]));
-  }, [roles]);
+  const usuarioRoleNamesById = useMemo(() => {
+    const map = new Map<string, string>();
+    usuarios.forEach((usuario) => {
+      const rolValue = usuario.rol;
+      if (!rolValue) return;
+
+      if (typeof rolValue === "string") {
+        map.set(rolValue, rolValue);
+        return;
+      }
+
+      const key = rolValue._id ?? rolValue.nombre;
+      if (!key) return;
+      const candidate = rolValue.nombre ?? key;
+      map.set(key, candidate);
+    });
+    return map;
+  }, [usuarios]);
+
+  const resolvedRoleLabels = useMemo(() => {
+    const remainingSlugs = new Set(Object.keys(DEFAULT_ROLE_LABELS));
+    const labelMap = new Map<string, string>();
+    const roleLookup = new Map(roles.map((role) => [role._id, role]));
+
+    const orderedIds: string[] = [];
+    const seenIds = new Set<string>();
+    const enqueueId = (id?: string | null) => {
+      if (!id || seenIds.has(id)) return;
+      seenIds.add(id);
+      orderedIds.push(id);
+    };
+
+    roles.forEach((role) => enqueueId(role._id));
+    usuarioRoleNamesById.forEach((_, id) => enqueueId(id));
+
+    const registerSlug = (value?: string | null) => {
+      const normalized = normalizeRoleLabel(value);
+      if (normalized) {
+        remainingSlugs.delete(normalized.toLowerCase());
+      }
+      return normalized;
+    };
+
+    orderedIds.forEach((id) => {
+      const role = roleLookup.get(id);
+      const candidates = [
+        role?.nombre,
+        role?.descripcion,
+        usuarioRoleNamesById.get(id),
+      ];
+
+      for (const candidate of candidates) {
+        const normalized = registerSlug(candidate);
+        if (normalized) {
+          labelMap.set(id, normalized);
+          break;
+        }
+      }
+
+      if (!labelMap.has(id)) {
+        labelMap.set(id, "");
+      }
+    });
+
+    labelMap.forEach((label, id) => {
+      if (label) return;
+      const iterator = remainingSlugs.values().next();
+      const slug = iterator.value as string | undefined;
+      if (slug) {
+        remainingSlugs.delete(slug);
+        labelMap.set(id, DEFAULT_ROLE_LABELS[slug]);
+      } else {
+        labelMap.set(id, usuarioRoleNamesById.get(id) ?? id);
+      }
+    });
+
+    return labelMap;
+  }, [roles, usuarioRoleNamesById]);
+
+  const formatRoleDisplay = useCallback((value?: string | null) => {
+    return normalizeRoleLabel(value) ?? value ?? "";
+  }, []);
 
   const getRolNombre = useCallback(
     (usuario: UsuarioItem) => {
       if (!usuario.rol) return "";
       if (typeof usuario.rol === "string") {
-        return rolesById.get(usuario.rol) ?? usuario.rol;
+        return (
+          resolvedRoleLabels.get(usuario.rol) ??
+          formatRoleDisplay(usuario.rol)
+        );
       }
       const populatedId = usuario.rol._id;
       if (populatedId) {
-        return rolesById.get(populatedId) ?? usuario.rol.nombre ?? "";
+        return (
+          resolvedRoleLabels.get(populatedId) ??
+          formatRoleDisplay(usuario.rol.nombre)
+        );
       }
-      return usuario.rol.nombre ?? "";
+      return formatRoleDisplay(usuario.rol.nombre);
     },
-    [rolesById]
+    [resolvedRoleLabels, formatRoleDisplay]
   );
 
   const getDniNumero = useCallback((usuario: UsuarioItem) => {
@@ -171,33 +274,34 @@ export default function UsersPage() {
   }, [usuarios, searchTerm, getDniNumero, getRolNombre]);
 
   const roleOptions = useMemo(() => {
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    const pushId = (id?: string | null) => {
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      ids.push(id);
+    };
+
     if (roles.length > 0) {
-      return roles
-        .map((role) => ({ value: role._id, label: role.nombre }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+      roles.forEach((role) => pushId(role._id));
+    } else {
+      resolvedRoleLabels.forEach((_, id) => pushId(id));
     }
 
-    const rolesMap = new Map<string, string>();
-    usuarios.forEach((usuario) => {
-      if (!usuario.rol) return;
-      if (typeof usuario.rol === "string") {
-        rolesMap.set(usuario.rol, usuario.rol);
-      } else {
-        const value = usuario.rol._id ?? usuario.rol.nombre ?? "";
-        const label = usuario.rol.nombre ?? value;
-        if (value) rolesMap.set(value, label);
-      }
-    });
-    return Array.from(rolesMap.entries())
-      .map(([value, label]) => ({value, label}))
+    return ids
+      .map((id) => ({
+        value: id,
+        label: resolvedRoleLabels.get(id) ?? id,
+      }))
+      .filter((option) => Boolean(option.label))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [roles, usuarios]);
+  }, [roles, resolvedRoleLabels]);
 
   const typeOptions = useMemo(() => {
     // Backend expects 'interno' or 'externo'
     const tipos = ["interno", "externo"];
     return Array.from(tipos).sort((a, b) => a.localeCompare(b));
-  }, [usuarios]);
+  }, []);
   const handleFormInput = (field: keyof CrearUsuarioPayload, value: string) => {
     setFormState((prev) => ({...prev, [field]: value}));
   };
@@ -344,7 +448,9 @@ export default function UsersPage() {
           </div>
         ) : filteredUsuarios.length === 0 ? (
           <div className="rounded-lg border border-border bg-muted/40 p-6 text-center text-sm text-foreground-secondary">
-            No se encontraron coincidencias para "{searchTerm}".
+            {"No se encontraron coincidencias para "}
+            <span className="font-medium">{`"${searchTerm}"`}</span>
+            {"."}
           </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-border bg-white">

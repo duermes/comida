@@ -335,7 +335,9 @@ export default function ProductsPage() {
           </div>
         ) : filteredPlatos.length === 0 ? (
           <div className="rounded-lg border border-border bg-muted/40 p-6 text-center text-sm text-foreground-secondary">
-            No se encontraron coincidencias para "{searchTerm}".
+            {"No se encontraron coincidencias para "}
+            <span className="font-medium">{`"${searchTerm}"`}</span>
+            {"."}
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
