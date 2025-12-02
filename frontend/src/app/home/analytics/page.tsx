@@ -10,6 +10,7 @@ import {
   type PedidoResponse,
   type SedeItem,
 } from "@/lib/api";
+import {normalizeRoleSlug} from "@/lib/utils";
 
 function LoadingView() {
   return (
@@ -77,7 +78,7 @@ export default function AnalyticsPage() {
 
     try {
       const parsed = JSON.parse(stored);
-      if (parsed?.rol !== "admin") {
+      if (normalizeRoleSlug(parsed?.rol) !== "admin") {
         router.replace("/home/menu");
         return;
       }

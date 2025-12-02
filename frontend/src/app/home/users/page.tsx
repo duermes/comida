@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {normalizeRoleSlug} from "@/lib/utils";
 
 const DEFAULT_ROLE_LABELS: Record<string, string> = {
   admin: "admin",
@@ -85,7 +86,7 @@ export default function UsersPage() {
 
     try {
       const parsed = JSON.parse(stored);
-      if (parsed?.rol !== "admin") {
+      if (normalizeRoleSlug(parsed?.rol) !== "admin") {
         router.replace("/home/menu");
         return;
       }

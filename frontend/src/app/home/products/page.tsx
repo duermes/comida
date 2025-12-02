@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {normalizeRoleSlug} from "@/lib/utils";
 
 const BASE_CATEGORIES: Array<PlatoMenuItem["tipo"]> = [
   "bebida",
@@ -88,7 +89,7 @@ export default function ProductsPage() {
 
     try {
       const parsed = JSON.parse(stored);
-      if (parsed?.rol !== "admin") {
+      if (normalizeRoleSlug(parsed?.rol) !== "admin") {
         router.replace("/home/menu");
         return;
       }

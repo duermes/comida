@@ -5,6 +5,7 @@ import Sede from "../models/sede.model.js";
 import bcrypt from "bcrypt";
 import speakeasy from "speakeasy";
 import { createAccessToken, createMfaToken, verifyJwt } from "../lib/jwt.js";
+import { resolveRoleName } from "../lib/utils.js";
 
 function escapeRegex(str = "") {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -245,15 +246,17 @@ export const login = async (req, reply) => {
       });
     }
 
+    const resolvedRole = resolveRoleName(userFound.rol) ?? "usuario";
+
     const token = await createAccessToken({
       id: userFound._id,
-      rol: userFound.rol.nombre,
+      rol: resolvedRole,
     });
 
     reply.send({
       id: userFound._id,
       identificador,
-      rol: userFound.rol.nombre,
+      rol: resolvedRole,
       token,
     });
   } catch (error) {
@@ -287,10 +290,11 @@ export const getPerfil = async (req, reply) => {
       .join(" ")
       .trim();
 
+    const resolvedRoleName = resolveRoleName(user.rol) ?? "usuario";
     reply.send({
       id: user._id,
       nombre: nombreCompleto || user?.dni?.nombres || user?.codigoUsu || user?.dni?.numero,
-      rol: user.rol?.nombre,
+      rol: resolvedRoleName,
       codigoUsu: user.codigoUsu,
       dni: user.dni?.numero,
       tipo: user.tipo,
@@ -427,15 +431,16 @@ export const loginMfa = async (req, reply) => {
       return reply.status(400).send({ message: "Código MFA inválido" });
     }
 
+    const resolvedRole = resolveRoleName(user.rol) ?? "usuario";
     const token = await createAccessToken({
       id: user._id,
-      rol: user.rol?.nombre,
+      rol: resolvedRole,
     });
 
     reply.send({
       id: user._id,
       identificador: user.codigoUsu ?? user.dni?.numero,
-      rol: user.rol?.nombre,
+      rol: resolvedRole,
       token,
     });
   } catch (error) {

@@ -4,6 +4,7 @@ import {useRouter} from "next/navigation";
 import {LogOut} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {logout} from "@/lib/api";
+import {normalizeRoleSlug} from "@/lib/utils";
 
 interface HeaderProps {
   user: any;
@@ -13,14 +14,17 @@ export default function Header({user}: HeaderProps) {
   const router = useRouter();
 
   const roleLabels: Record<string, string> = {
-    usuario: "Estudiante",
-    profesor: "Profesor",
-    coordinador: "Coordinador",
-    admin: "Administrador",
+    usuario: "usuario",
+    profesor: "profesor",
+    coordinador: "coordinador",
+    admin: "admin",
   };
 
-  const displayRole = roleLabels[user?.rol] ?? "Usuario";
+  const roleSlug = normalizeRoleSlug(user?.rol);
+  const roleLabel = roleLabels[roleSlug];
+  const displayRole = roleLabel ?? roleSlug ?? "usuario";
   const displayName = user?.nombre ?? "Usuario";
+  const greeting = displayRole ? `${displayRole} ${displayName}` : displayName;
 
   const handleLogout = async () => {
     try {
@@ -47,7 +51,7 @@ export default function Header({user}: HeaderProps) {
         <div className="flex items-center space-x-3">
           <div className="text-right">
             <p className="text-sm font-medium text-foreground">
-              Hola, {displayName}
+              Hola {greeting}
             </p>
             <p className="text-xs text-foreground-secondary">{displayRole}</p>
           </div>

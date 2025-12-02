@@ -1,6 +1,7 @@
 // middlewares/auth.middleware.js
 import jwt from "jsonwebtoken";
 import Usuario from "../models/usuario.model.js";
+import { resolveRoleName } from "../lib/utils.js";
 
 // Middleware para verificar el token JWT
 export async function verificarToken(req, reply) {
@@ -26,9 +27,7 @@ export async function verificarToken(req, reply) {
     }
 
     // Guardar la información del usuario en req.user
-    const rolNombre = typeof usuario.rol === "object" && usuario.rol !== null
-      ? usuario.rol.nombre ?? usuario.rol
-      : usuario.rol;
+    const rolNombre = resolveRoleName(usuario.rol) ?? usuario.rol;
 
     req.user = {
       id: usuario._id,

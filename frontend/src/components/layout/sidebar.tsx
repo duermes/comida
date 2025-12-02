@@ -12,6 +12,7 @@ import {
   LogOut,
 } from "lucide-react";
 import {logout} from "@/lib/api";
+import {normalizeRoleSlug} from "@/lib/utils";
 
 interface SidebarProps {
   user: any;
@@ -20,7 +21,7 @@ interface SidebarProps {
 export default function Sidebar({user}: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const isAdmin = user?.rol === "admin";
+  const isAdmin = normalizeRoleSlug(user?.rol) === "admin";
 
   const userMenuItems = [
     {href: "/home/menu", label: "Menú", icon: UtensilsCrossed},

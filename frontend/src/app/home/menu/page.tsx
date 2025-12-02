@@ -7,11 +7,13 @@ import ReservationSummary from "@/components/menu/reservation-summary";
 import {
   getFavoritos,
   getMenus,
+  getProfile,
   toggleFavorito,
   type FavoritoResponse,
   type PopulatedMenu,
   type UsuarioPerfil,
 } from "@/lib/api";
+import {normalizeRoleSlug} from "@/lib/utils";
 
 const CATEGORY_OPTIONS = [
   {value: "normal", label: "Menú universitario"},
@@ -33,6 +35,7 @@ export default function MenuPage() {
   const [loadingFavorites, setLoadingFavorites] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<UsuarioPerfil | null>(null);
+  const userRole = normalizeRoleSlug(currentUser?.rol);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -47,6 +50,27 @@ export default function MenuPage() {
         err
       );
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const syncProfile = async () => {
+      try {
+        const profile = await getProfile();
+        if (cancelled) return;
+        setCurrentUser(profile);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("user", JSON.stringify(profile));
+        }
+      } catch (err) {
+        console.error("Error actualizando perfil:", err);
+      }
+    };
+
+    syncProfile();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -361,7 +385,7 @@ export default function MenuPage() {
             onCategoryChange={setSelectedCategory}
             onSearchChange={setSearchTerm}
             onDateChange={setSelectedDate}
-            showDatePicker={currentUser?.rol === "coordinador"}
+            showDatePicker={userRole === "coordinador"}
           />
 
           <MenuGrid

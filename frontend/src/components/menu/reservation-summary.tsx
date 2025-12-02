@@ -7,11 +7,12 @@ import type {DisplayMenuItem} from "@/components/menu/menu-grid";
 import {Input} from "@/components/ui/input";
 import type {PedidoResponse, UsuarioPerfil, PlatoMenuItem} from "@/lib/api";
 import {crearPedido, registrarEncuesta, getPlatosMenu} from "@/lib/api";
+import {normalizeRoleSlug} from "@/lib/utils";
 
 interface ReservationSummaryProps {
   reservation: DisplayMenuItem;
   onClose: () => void;
-  onOrderCreated?: (pedido: PedidoResponse) => void;
+  onOrderCreated?: (pedido: PedidoResponse | PedidoResponse[]) => void;
   currentUser?: UsuarioPerfil | null;
 }
 
@@ -21,6 +22,8 @@ type ExecutiveSelection = {
   postre?: string;
   bebida?: string;
 };
+
+const MAX_BULK_DAYS = 7;
 
 export default function ReservationSummary({
   reservation,
@@ -36,13 +39,13 @@ export default function ReservationSummary({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [surveyFeedback, setSurveyFeedback] = useState<string | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
-  const [scheduledDate, setScheduledDate] = useState<string>("");
+  const [scheduledDates, setScheduledDates] = useState<string[]>([]);
 
   const menu = reservation.menu;
-  const userRole = currentUser?.rol?.toLowerCase() ?? "";
+  const userRole = normalizeRoleSlug(currentUser?.rol);
   const hasBulkPrivileges = userRole === "coordinador" || userRole === "profesor";
   const isCoordinator = userRole === "coordinador";
-  const maxQuantity = hasBulkPrivileges ? 200 : 5;
+  const maxQuantity = hasBulkPrivileges ? undefined : 5;
   const todayISO = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
   const menuDateISO = useMemo(() => {
     try {
@@ -51,6 +54,45 @@ export default function ReservationSummary({
       return "";
     }
   }, [menu.fecha]);
+
+  const displayScheduledDates = scheduledDates.length ? scheduledDates : [menuDateISO];
+  const sanitizedScheduledDates = displayScheduledDates
+    .map((date) => date?.trim())
+    .filter(Boolean);
+  const uniqueScheduledDates = Array.from(new Set(sanitizedScheduledDates));
+  const primaryScheduledDate = displayScheduledDates[0] || menuDateISO;
+  const firstScheduledDate = sanitizedScheduledDates[0] ?? null;
+  const fallbackBulkDate = menuDateISO || todayISO;
+
+  const addScheduledDate = () => {
+    setScheduledDates((prev) => {
+      if (prev.length >= MAX_BULK_DAYS) return prev;
+      return [...prev, fallbackBulkDate];
+    });
+  };
+
+  const updateScheduledDate = (index: number, value: string) => {
+    setScheduledDates((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  };
+
+  const removeScheduledDate = (index: number) => {
+    setScheduledDates((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, idx) => idx !== index);
+    });
+  };
+
+  const setPrimaryScheduledDate = (value: string) => {
+    setScheduledDates((prev) => {
+      const next = prev.length ? [...prev] : [value];
+      next[0] = value;
+      return next;
+    });
+  };
 
   const menuSedeId = useMemo(() => {
     const raw = menu.sede;
@@ -78,20 +120,19 @@ export default function ReservationSummary({
   }, [menu.sedeNombre, menu.sede]);
 
   const formattedDate = useMemo(() => {
-    if (!scheduledDate) {
-      try {
-        return format(new Date(menu.fecha), "PPP", {locale: es});
-      } catch (error) {
-        return "Fecha no disponible";
-      }
+    const dateToFormat = primaryScheduledDate || menuDateISO;
+    if (!dateToFormat) {
+      return "Fecha no disponible";
     }
-
     try {
-      return format(new Date(scheduledDate), "PPP", {locale: es});
+      return format(new Date(dateToFormat), "PPP", {locale: es});
     } catch (error) {
       return "Fecha no disponible";
     }
-  }, [menu.fecha, scheduledDate]);
+  }, [primaryScheduledDate, menuDateISO]);
+  const fechaInfo = hasBulkPrivileges && uniqueScheduledDates.length > 1
+    ? `${formattedDate} (+${uniqueScheduledDates.length - 1} días más)`
+    : formattedDate;
 
   const total = useMemo(
     () => reservation.price * quantity,
@@ -118,9 +159,16 @@ export default function ReservationSummary({
     setSurveySelection([]);
     setFeedback(null);
     setSurveyFeedback(null);
-    setScheduledDate(menuDateISO);
+    setScheduledDates(menuDateISO ? [menuDateISO] : []);
     setQuantity(1);
-  }, [menu.ejecutivo, menuDateISO, reservation]);
+  }, [
+    menu.ejecutivo,
+    menu.normal?.entrada?._id,
+    menu.normal?.segundo?._id,
+    menu.normal?.bebida?._id,
+    menuDateISO,
+    reservation,
+  ]);
 
   const handleExecutiveSelect = (
     field: keyof ExecutiveSelection,
@@ -140,8 +188,11 @@ export default function ReservationSummary({
 
   const adjustQuantity = (delta: number) => {
     setQuantity((prev) => {
-      const next = Math.max(1, Math.min(maxQuantity, prev + delta));
-      return next;
+      const raw = prev + delta;
+      if (hasBulkPrivileges) {
+        return Math.max(1, raw);
+      }
+      return Math.max(1, Math.min(maxQuantity ?? 5, raw));
     });
   };
 
@@ -158,7 +209,9 @@ export default function ReservationSummary({
     }
 
     const normalized = Math.floor(parsed);
-    const clamped = Math.max(1, Math.min(maxQuantity, normalized));
+    const clamped = hasBulkPrivileges
+      ? Math.max(1, normalized)
+      : Math.max(1, Math.min(maxQuantity ?? 5, normalized));
     setQuantity(clamped);
   };
 
@@ -182,11 +235,8 @@ export default function ReservationSummary({
     setIsSubmitting(true);
     setFeedback(null);
     try {
-      const fechaEntregaValue = hasBulkPrivileges && scheduledDate ? scheduledDate : undefined;
-
-      const pedido = await crearPedido({
+      const basePayload = {
         sede: menuSedeId,
-        ...(fechaEntregaValue ? {fechaEntrega: fechaEntregaValue} : {}),
         items: [
           {
             refId: menuId,
@@ -195,10 +245,37 @@ export default function ReservationSummary({
             precioUnitario: reservation.price,
           },
         ],
-      });
+      };
 
-      setFeedback("Reserva creada correctamente");
-      onOrderCreated?.(pedido);
+      const createdOrders: PedidoResponse[] = [];
+      if (hasBulkPrivileges && uniqueScheduledDates.length > 0) {
+        for (const date of uniqueScheduledDates) {
+          const payload = {
+            ...basePayload,
+            fechaEntrega: date,
+          };
+          const pedido = await crearPedido(payload);
+          createdOrders.push(pedido);
+        }
+      } else {
+        const payload = {...basePayload};
+        if (hasBulkPrivileges && firstScheduledDate) {
+          payload.fechaEntrega = firstScheduledDate;
+        }
+        const pedido = await crearPedido(payload);
+        createdOrders.push(pedido);
+      }
+
+      const message =
+        createdOrders.length > 1
+          ? `Reservas creadas para ${createdOrders.length} días`
+          : "Reserva creada correctamente";
+      setFeedback(message);
+      if (createdOrders.length === 1) {
+        onOrderCreated?.(createdOrders[0]);
+      } else if (createdOrders.length > 1) {
+        onOrderCreated?.(createdOrders);
+      }
     } catch (error) {
       console.error("Error al crear reserva:", error);
       setFeedback(
@@ -425,7 +502,7 @@ export default function ReservationSummary({
           </div>
           <p className="mt-1 text-xs text-foreground-secondary">
             {hasBulkPrivileges
-              ? `Puedes solicitar pedidos masivos desde tu perfil institucional (hasta ${maxQuantity} unidades por pedido).`
+              ? "Puedes solicitar pedidos masivos sin límite y programarlos para múltiples fechas."
               : `Máximo ${maxQuantity} unidades por pedido.`}
           </p>
         </div>
@@ -435,31 +512,54 @@ export default function ReservationSummary({
             <label className="block text-sm font-medium text-foreground">
               Programar fecha de entrega
             </label>
+            <div className="mt-2 space-y-3">
+              {displayScheduledDates.map((dateValue, index) => (
+                <div key={`scheduled-date-${index}`} className="flex items-center gap-3">
+                  <Input
+                    type="date"
+                    value={dateValue ?? ""}
+                    min={todayISO}
+                    onChange={(event) => updateScheduledDate(index, event.target.value)}
+                    className="w-full"
+                  />
+                  {displayScheduledDates.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeScheduledDate(index)}
+                      className="px-3 py-2 text-xs font-semibold text-error border border-error/30 rounded-lg hover:bg-error/10 transition-smooth"
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              <Input
-                type="date"
-                value={scheduledDate || ""}
-                min={todayISO}
-                onChange={(event) => setScheduledDate(event.target.value)}
-                className="w-48"
-              />
               <button
                 type="button"
-                onClick={() => setScheduledDate(menuDateISO)}
+                onClick={addScheduledDate}
+                disabled={displayScheduledDates.length >= MAX_BULK_DAYS}
+                className="px-3 py-2 text-sm font-medium text-primary border border-primary/20 rounded-lg bg-primary/5 hover:bg-primary/10 transition-smooth disabled:opacity-60"
+              >
+                + Agregar día
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrimaryScheduledDate(menuDateISO)}
                 className="px-3 py-2 text-sm font-medium text-primary border border-primary/20 rounded-lg bg-primary/5 hover:bg-primary/10 transition-smooth"
               >
                 Usar fecha del menú
               </button>
               <button
                 type="button"
-                onClick={() => setScheduledDate("")}
+                onClick={() => setPrimaryScheduledDate("")}
                 className="px-3 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-background-secondary transition-smooth"
               >
                 Sin programación
               </button>
             </div>
             <p className="mt-1 text-xs text-foreground-secondary">
-              Deja la programación vacía para utilizar la fecha del menú o selecciona un día futuro para pedidos especiales.
+              Puedes programar hasta {MAX_BULK_DAYS} fechas distintas y dejar el campo vacío para usar la fecha del menú.
             </p>
           </div>
         )}
@@ -468,7 +568,7 @@ export default function ReservationSummary({
       <div className="space-y-3 mb-6 pb-6 border-b border-border text-sm">
         <InfoRow label="Menú" value={reservation.title} />
         <InfoRow label="Comedor" value={menuSedeNombre || "Sin sede definida"} />
-        <InfoRow label="Fecha" value={formattedDate} />
+        <InfoRow label="Fecha" value={fechaInfo} />
         <InfoRow
           label="Cantidad"
           value={`${quantity} unidad${quantity === 1 ? "" : "es"}`}
